@@ -1,72 +1,67 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import LoginPage from './LoginPage'
-import AdminDashboard from './AdminDashboard'
+import AdminDashboard from './components/AdminDashboard'
+import CustomerDashboard from './components/CustomerDashboard'
 
 function App() {
-  const [admin, setAdmin] = useState(null)
-  const [users, setUsers] = useState([])
-  const [packages, setPackages] = useState([])
-  const [adminUsers, setAdminUsers] = useState([])
+  const [user, setUser] = useState(null)
+  const [userType, setUserType] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
 
   useEffect(() => {
-    // Check if admin already logged in
-    const savedAdmin = localStorage.getItem('admin')
-    if (savedAdmin) {
-      setAdmin(JSON.parse(savedAdmin))
-    } else {
-      setLoading(false)
+    const savedUser = localStorage.getItem('user')
+    const savedUserType = localStorage.getItem('userType')
+    if (savedUser && savedUserType) {
+      try {
+        setUser(JSON.parse(savedUser))
+        setUserType(savedUserType)
+      } catch (e) {
+        console.error('Error parsing saved user:', e)
+      }
     }
+    setLoading(false)
   }, [])
 
-  useEffect(() => {
-    if (admin) {
-      fetchData()
-    }
-  }, [admin])
+  const handleLogin = (userData, role) => {
+    const loginData = { ...userData, role }
+    localStorage.setItem('user', JSON.stringify(loginData))
+    localStorage.setItem('userType', role)
+    setUser(loginData)
+    setUserType(role)
+  }
 
-  const fetchData = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      // Mock data
-      const mockUsers = [
-        { id: 1, name: 'Rajib Khan', email: 'rajib@example.com', status: 'active' },
-        { id: 2, name: 'Karim Ahmed', email: 'karim@example.com', status: 'active' },
-        { id: 3, name: 'Fatima Islam', email: 'fatima@example.com', status: 'inactive' },
-      ]
-      
-      const mockPackages = [
-        { id: 1, name: 'Basic Plan', speed: 5, price: 500 },
-        { id: 2, name: 'Standard Plan', speed: 10, price: 1000 },
-        { id: 3, name: 'Premium Plan', speed: 20, price: 1500 },
-        { id: 4, name: 'Enterprise Plan', speed: 50, price: 3000 },
-      ]
-
-      setUsers(mockUsers)
-      setPackages(mockPackages)
-      setAdminUsers([{ id: 1, name: 'System Admin', email: 'admin@rightnet.local', role: 'admin' }])
-    } catch (err) {
-      setError('Failed to fetch data')
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('user')
+    localStorage.removeItem('userType')
+    setUser(null)
+    setUserType(null)
   }
 
   if (loading) {
-    return <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh'}}>Loading...</div>
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        fontSize: '1.5rem',
+        color: '#666'
+      }}>
+        Loading...
+      </div>
+    )
   }
 
-  // If admin is logged in, show admin dashboard
-  if (admin) {
-    return <AdminDashboard admin={admin} onLogout={() => setAdmin(null)} />
+  if (!user || !userType) {
+    return <LoginPage onLogin={handleLogin} />
   }
 
-  // Otherwise show login page
-  return <LoginPage onLogin={setAdmin} />
+  if (userType === 'admin') {
+    return <AdminDashboard admin={user} onLogout={handleLogout} />
+  }
+
+  return <CustomerDashboard admin={user} onLogout={handleLogout} />
 }
 
 export default App

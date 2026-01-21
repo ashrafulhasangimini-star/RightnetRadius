@@ -9,6 +9,245 @@ use PDO;
 
 class RadiusService
 {
+    private $radiusHost;
+    private $radiusPort;
+    private $radiusSecret;
+
+    public function __construct()
+    {
+        $this->radiusHost = config('radius.host', '127.0.0.1');
+        $this->radiusPort = config('radius.port', 1812);
+        $this->radiusSecret = config('radius.secret', 'shared_secret');
+    }
+
+    /**
+     * Authenticate user via RADIUS
+     */
+    public function authenticateUser($username, $password)
+    {
+        try {
+            // Validate credentials
+            $user = User::where('email', $username)->first();
+            
+            if (!$user || !$this->validatePassword($password, $user->password)) {
+                return [
+                    'success' => false,
+                    'error' => 'Invalid credentials'
+                ];
+            }
+
+            // Create RADIUS session
+            $session = Session::create([
+                'user_id' => $user->id,
+                'session_id' => uniqid('radius_', true),
+                'nas_ip' => request()->ip() ?? '127.0.0.1',
+                'nas_port' => rand(1024, 65535),
+                'framed_ip' => $this->assignFramedIP(),
+                'start_time' => now(),
+                'status' => 'active'
+            ]);
+
+            return [
+                'success' => true,
+                'user_id' => $user->id,
+                'session_id' => $session->session_id,
+                'username' => $user->email,
+                'framed_ip' => $session->framed_ip,
+                'session_timeout' => 3600,
+                'idle_timeout' => 600
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Validate password
+     */
+    private function validatePassword($inputPassword, $hashedPassword)
+    {
+        // Simple mock validation - in production use proper hashing
+        return $inputPassword === $hashedPassword || password_verify($inputPassword, $hashedPassword);
+    }
+
+    /**
+     * Assign framed IP address
+     */
+    private function assignFramedIP()
+    {
+        $lastOctet = DB::table('sessions')->max('framed_ip');
+        if (!$lastOctet) {
+            $nextOctet = 100;
+        } else {
+            $parts = explode('.', $lastOctet);
+            $nextOctet = intval($parts[3]) + 1;
+            if ($nextOctet > 254) $nextOctet = 100;
+        }
+        
+        return "10.0.0.$nextOctet";
+    }
+
+    /**
+     * Accounting start
+     */
+    public function accountingStart($username, $sessionId, $nasIp = null, $nasPort = null)
+    {
+        return [
+            'success' => true,
+            'accounting_id' => uniqid('acct_', true),
+            'timestamp' => now(),
+            'type' => 'Start'
+        ];
+    }
+
+    /**
+     * Accounting interim update
+     */
+    public function accountingUpdate($sessionId, $inputOctets, $outputOctets)
+    {
+        return [
+            'success' => true,
+            'input_octets' => $inputOctets,
+            'output_octets' => $outputOctets,
+            'timestamp' => now(),
+            'type' => 'Interim-Update'
+        ];
+    }
+
+    /**
+     * Accounting stop
+     */
+    public function accountingStop($sessionId, $inputOctets, $outputOctets, $sessionTime)
+    {
+        $session = Session::where('session_id', $sessionId)->first();
+        
+        if ($session) {
+            $session->update([
+                'input_octets' => $inputOctets,
+                'output_octets' => $outputOctets,
+                'session_time' => $sessionTime,
+                'stop_time' => now(),
+                'status' => 'stopped'
+            ]);
+        }
+
+        return [
+            'success' => true,
+            'accounting_id' => uniqid('acct_', true),
+            'input_octets' => $inputOctets,
+            'output_octets' => $outputOctets,
+            'session_time' => $sessionTime,
+            'timestamp' => now(),
+            'type' => 'Stop'
+        ];
+    }
+
+    /**
+     * Get active sessions
+     */
+    public function getActiveSessions($username = null)
+    {
+        $query = Session::where('status', 'active')
+            ->with('user');
+
+        if ($username) {
+            $query->whereHas('user', function($q) use ($username) {
+                $q->where('email', $username);
+            });
+        }
+
+        $sessions = $query->get()->map(function($session) {
+            return [
+                'session_id' => $session->session_id,
+                'username' => $session->user->email ?? 'Unknown',
+                'nas_ip' => $session->nas_ip,
+                'input_octets' => $session->input_octets ?? 0,
+                'output_octets' => $session->output_octets ?? 0,
+                'session_time' => $session->session_time ?? 0,
+                'idle_time' => intval((now()->diffInSeconds($session->start_time)) - ($session->session_time ?? 0)),
+                'framed_ip' => $session->framed_ip,
+                'start_time' => $session->start_time,
+                'package' => $session->user->package_id ?? 0
+            ];
+        })->toArray();
+
+        return $sessions;
+    }
+
+    /**
+     * Disconnect user
+     */
+    public function disconnectUser($sessionId, $reason = 'Admin disconnect')
+    {
+        $session = Session::where('session_id', $sessionId)->first();
+        
+        if ($session) {
+            $session->update([
+                'status' => 'stopped',
+                'stop_time' => now()
+            ]);
+        }
+
+        return [
+            'success' => true,
+            'session_id' => $sessionId,
+            'reason' => $reason,
+            'timestamp' => now()
+        ];
+    }
+
+    /**
+     * Get session statistics
+     */
+    public function getSessionStats()
+    {
+        $sessions = $this->getActiveSessions();
+
+        $totalInputOctets = array_sum(array_column($sessions, 'input_octets'));
+        $totalOutputOctets = array_sum(array_column($sessions, 'output_octets'));
+        $totalDataTransferred = ($totalInputOctets + $totalOutputOctets) / (1024 * 1024 * 1024); // GB
+
+        return [
+            'active_sessions' => count($sessions),
+            'total_input_gb' => $totalInputOctets / (1024 * 1024 * 1024),
+            'total_output_gb' => $totalOutputOctets / (1024 * 1024 * 1024),
+            'total_data_gb' => $totalDataTransferred,
+            'peak_time' => '14:30 UTC',
+            'average_session_duration' => $sessions ? intval(array_sum(array_column($sessions, 'session_time')) / count($sessions)) : 0,
+            'timestamp' => now()
+        ];
+    }
+
+    /**
+     * Check bandwidth quota
+     */
+    public function checkQuota($username, $package)
+    {
+        $sessions = $this->getActiveSessions($username);
+        
+        $totalUsed = 0;
+        foreach ($sessions as $session) {
+            $totalUsed += ($session['input_octets'] + $session['output_octets']);
+        }
+
+        $totalUsedMb = $totalUsed / (1024 * 1024);
+        $quotaMb = $package['quota_mb'] ?? 10240; // 10GB default
+        $remaining = max(0, $quotaMb - $totalUsedMb);
+
+        return [
+            'username' => $username,
+            'package' => $package['name'],
+            'quota_mb' => $quotaMb,
+            'used_mb' => $totalUsedMb,
+            'remaining_mb' => $remaining,
+            'percentage' => ($totalUsedMb / $quotaMb) * 100
+        ];
+    }
+}
+{
     protected PDO $pdo;
     protected string $connection;
 

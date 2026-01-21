@@ -6,31 +6,54 @@ function LoginPage({ onLogin }) {
   const [password, setPassword] = useState('password')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loginType, setLoginType] = useState('admin') // 'admin' or 'customer'
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    // Mock login - in real app this would call your API
-    try {
+    // Mock admin authentication
+    if (loginType === 'admin') {
       if (email === 'admin@rightnet.local' && password === 'password') {
         const adminData = {
           id: 1,
           name: 'System Admin',
           email: 'admin@rightnet.local',
-          role: 'admin',
-          token: 'mock-jwt-token-' + Date.now(),
+          token: 'admin-token-' + Date.now(),
         }
-        localStorage.setItem('admin', JSON.stringify(adminData))
-        onLogin(adminData)
+        onLogin(adminData, 'admin')
       } else {
-        setError('Invalid email or password')
+        setError('Invalid admin credentials')
+        setLoading(false)
       }
-    } catch (err) {
-      setError('Login failed: ' + err.message)
-    } finally {
-      setLoading(false)
+    } 
+    // Mock customer authentication
+    else if (loginType === 'customer') {
+      if (email === 'customer@example.com' && password === 'password') {
+        const customerData = {
+          id: 100,
+          name: 'Rajib Khan',
+          email: 'customer@example.com',
+          token: 'customer-token-' + Date.now(),
+        }
+        onLogin(customerData, 'customer')
+      } else {
+        setError('Invalid customer credentials')
+        setLoading(false)
+      }
+    }
+  }
+
+  const handleTabChange = (type) => {
+    setLoginType(type)
+    setError('')
+    if (type === 'admin') {
+      setEmail('admin@rightnet.local')
+      setPassword('password')
+    } else {
+      setEmail('customer@example.com')
+      setPassword('password')
     }
   }
 
@@ -38,42 +61,73 @@ function LoginPage({ onLogin }) {
     <div className="login-container">
       <div className="login-box">
         <h1 className="login-title">RightnetRadius</h1>
-        <p className="login-subtitle">Admin Panel</p>
+        <p className="login-subtitle">ISP Management System</p>
+
+        {/* Tab Buttons */}
+        <div className="login-tabs">
+          <button 
+            className={`tab-btn ${loginType === 'admin' ? 'active' : ''}`}
+            onClick={() => handleTabChange('admin')}
+          >
+            👤 Admin Login
+          </button>
+          <button 
+            className={`tab-btn ${loginType === 'customer' ? 'active' : ''}`}
+            onClick={() => handleTabChange('customer')}
+          >
+            👥 Customer Login
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="login-error">{error}</div>}
 
           <div className="form-group">
-            <label>Email</label>
+            <label htmlFor="email">Email Address</label>
             <input
+              id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
               disabled={loading}
               required
             />
           </div>
 
           <div className="form-group">
-            <label>Password</label>
+            <label htmlFor="password">Password</label>
             <input
+              id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
               disabled={loading}
               required
             />
           </div>
 
-          <button type="submit" disabled={loading} className="login-btn">
-            {loading ? 'Logging in...' : 'Login'}
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? 'Logging in...' : `${loginType === 'admin' ? 'Admin' : 'Customer'} Login`}
           </button>
         </form>
 
-        <div className="login-info">
-          <p><strong>Demo Credentials:</strong></p>
-          <p>Email: admin@rightnet.local</p>
-          <p>Password: password</p>
+        <div className="demo-credentials">
+          <p><strong>📝 Demo Credentials:</strong></p>
+          {loginType === 'admin' ? (
+            <>
+              <p>Email: <code>admin@rightnet.local</code></p>
+              <p>Password: <code>password</code></p>
+              <p className="demo-note">Admin dashboard with full management features</p>
+            </>
+          ) : (
+            <>
+              <p>Email: <code>customer@example.com</code></p>
+              <p>Password: <code>password</code></p>
+              <p className="demo-note">Customer portal with billing & support</p>
+            </>
+          )}
         </div>
       </div>
     </div>
