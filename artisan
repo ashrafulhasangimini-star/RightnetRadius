@@ -1,0 +1,34 @@
+#!/usr/bin/env php
+<?php
+
+define('LARAVEL_START', microtime(true));
+
+/*
+|--------------------------------------------------------------------------
+| Register The Auto Loader
+|--------------------------------------------------------------------------
+|
+| Composer provides a convenient, automatically generated class loader
+| for our application. We just need to utilize it! We've already set it
+| to the autoload so we just need to require it into the script here.
+|
+*/
+
+require __DIR__.'/vendor/autoload.php';
+
+$app = require_once __DIR__.'/bootstrap/app.php';
+
+/*
+|--------------------------------------------------------------------------
+| Run The Artisan Application
+|--------------------------------------------------------------------------
+|
+| When we run the console application, the current CLI "command" will be
+| executed in an isolated manner within its own container so the setup
+| processes isolated containers don't interfere with each other at all.
+|
+*/
+
+$kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+
+exit($kernel->handle(new \Symfony\Component\Console\Input\ArgvInput, new \Symfony\Component\Console\Output\ConsoleOutput));

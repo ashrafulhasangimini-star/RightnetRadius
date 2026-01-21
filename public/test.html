@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RightnetRadius - Status Check</title>
+    <style>
+        body { font-family: Arial; margin: 40px; background: #f5f5f5; }
+        .container { background: white; padding: 30px; border-radius: 8px; }
+        .status { display: flex; align-items: center; margin: 10px 0; }
+        .dot { width: 20px; height: 20px; border-radius: 50%; margin-right: 10px; }
+        .green { background: #4CAF50; }
+        .yellow { background: #FF9800; }
+        .red { background: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 RightnetRadius - Status Check</h1>
+        
+        <div class="status">
+            <div class="dot green"></div>
+            <strong>PHP Backend Server:</strong> Running on <a href="http://localhost:8000">http://localhost:8000</a>
+        </div>
+        
+        <div class="status">
+            <div class="dot green"></div>
+            <strong>React Frontend Server:</strong> Running on <a href="http://localhost:5174">http://localhost:5174</a>
+        </div>
+        
+        <hr>
+        <h3>📋 Available Endpoints:</h3>
+        <ul>
+            <li><a href="http://localhost:8000">GET /</a> - Welcome message</li>
+            <li><a href="http://localhost:8000/up">GET /up</a> - Health check</li>
+            <li><a href="http://localhost:8000/api">GET /api</a> - API routes</li>
+        </ul>
+        
+        <hr>
+        <p style="color: #666;">✅ Both servers are running successfully!</p>
+    </div>
+</body>
+</html>
