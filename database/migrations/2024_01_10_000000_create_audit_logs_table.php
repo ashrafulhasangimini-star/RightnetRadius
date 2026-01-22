@@ -10,19 +10,21 @@ return new class extends Migration
     {
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('admin_user_id')->nullable()->constrained('admin_users');
-            $table->string('action');
-            $table->string('entity_type');
-            $table->unsignedBigInteger('entity_id');
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('action'); // AUTH_ATTEMPT, SESSION_START, BANDWIDTH_CHANGE, etc.
+            $table->string('resource'); // user:username, session:id, etc.
             $table->json('old_values')->nullable();
             $table->json('new_values')->nullable();
             $table->ipAddress('ip_address')->nullable();
             $table->text('user_agent')->nullable();
-            $table->timestamp('created_at')->useCurrent();
+            $table->unsignedSmallInteger('status_code')->default(200);
+            $table->timestamps();
 
-            $table->index('admin_user_id');
-            $table->index('entity_type');
+            $table->index('user_id');
+            $table->index('action');
+            $table->index('resource');
             $table->index('created_at');
+            $table->index(['action', 'created_at']);
         });
     }
 

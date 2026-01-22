@@ -6,6 +6,7 @@ use App\Models\Package;
 use App\Models\AuthUser;
 use App\Http\Controllers\RadiusController;
 use App\Http\Controllers\SessionController;
+use App\Http\Controllers\AuditLogController;
 
 // CORS Header
 header('Access-Control-Allow-Origin: *');
@@ -66,6 +67,15 @@ Route::middleware('api')->group(function () {
     Route::post('users/{username}/disconnect-all', [SessionController::class, 'disconnectAll']);
     Route::get('reports/sessions', [SessionController::class, 'getSessionReport']);
     Route::get('reports/bandwidth', [SessionController::class, 'getBandwidthReport']);
+    
+    // Audit Logging
+    Route::get('audit-logs', [AuditLogController::class, 'index']);
+    Route::get('audit-logs/summary/{userId}', [AuditLogController::class, 'summary']);
+    Route::get('audit-logs/export', [AuditLogController::class, 'export']);
+    Route::get('audit-logs/auth-attempts', [AuditLogController::class, 'authAttempts']);
+    Route::get('audit-logs/quota-breaches', [AuditLogController::class, 'quotaBreaches']);
+    Route::get('audit-logs/admin-actions', [AuditLogController::class, 'adminActions']);
+    Route::get('audit-logs/stats', [AuditLogController::class, 'statistics']);
     
     // Authentication
     Route::post('login', function() { return ['message' => 'Login endpoint']; });

@@ -2,52 +2,464 @@
 
 namespace App\Services;
 
-use RuntimeException;
-use Exception;
+use Illuminate\Support\Facades\Cache;
 
 class MikroTikService
 {
-    protected $connection;
-    protected $socket;
+    private $host;
+    private $port;
+    private $username;
+    private $password;
+    private $socket;
 
     public function __construct()
     {
-        $this->connect();
-    }
-
-    public function __destruct()
-    {
-        $this->disconnect();
+        $this->host = config('radius.mikrotik_host', '192.168.1.254');
+        $this->port = config('radius.mikrotik_port', 8728);
+        $this->username = config('radius.mikrotik_user', 'admin');
+        $this->password = config('radius.mikrotik_password', 'password');
     }
 
     /**
-     * Connect to MikroTik API
+     * Connect to MikroTik RouterOS
      */
-    protected function connect(): void
+    public function connect()
     {
         try {
-            $config = config('mikrotik.api');
-            $protocol = $config['ssl'] ? 'ssl' : 'tcp';
-            $address = "{$protocol}://{$config['host']}:{$config['port']}";
-
-            $this->socket = fsockopen(
-                $config['host'],
-                $config['port'],
-                $errno,
-                $errstr,
-                $config['timeout'] ?? 10
-            );
-
+            $this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
             if (!$this->socket) {
-                throw new RuntimeException("Cannot connect to MikroTik: {$errstr} ({$errno})");
+                throw new \Exception('Cannot create socket');
             }
 
-            stream_set_timeout($this->socket, $config['timeout'] ?? 10);
-            $this->login($config['username'], $config['password']);
-        } catch (Exception $e) {
-            \Log::error('MikroTik connection error: ' . $e->getMessage());
-            throw $e;
+            $result = @socket_connect($this->socket, $this->host, $this->port);
+            if (!$result) {
+                throw new \Exception("Cannot connect to MikroTik: {$this->host}:{$this->port}");
+            }
+
+            socket_set_option($this->socket, SOL_SOCKET, SO_RCVTIMEO, ['sec' => 5, 'usec' => 0]);
+            socket_set_option($this->socket, SOL_SOCKET, SO_SNDTIMEO, ['sec' => 5, 'usec' => 0]);
+
+            \Log::info("Connected to MikroTik: {$this->host}:{$this->port}");
+            return true;
+
+        } catch (\Exception $e) {
+            \Log::error("MikroTik connection error: " . $e->getMessage());
+            return false;
         }
+    }
+
+    /**
+     * Disconnect from MikroTik
+     */
+    public function disconnect()
+    {
+        if ($this->socket) {
+            socket_close($this->socket);
+            $this->socket = null;
+        }
+    }
+
+    /**
+     * Add PPPoE user
+     */
+    public function addPPPoEUser($username, $password, $maxBitrateDl = null, $maxBitrateUl = null)
+    {
+        try {
+            if (!$this->connect()) {
+                return ['success' => false, 'message' => 'Connection failed'];
+            }
+
+            // Build commands
+            $commands = [
+                '/ppp/secret',
+                'add',
+                '=name=' . $username,
+                '=password=' . $password,
+                '=service=pppoe',
+                '=profile=default',
+            ];
+
+            if ($maxBitrateDl) {
+                $commands[] = '=max-limit-at-down=' . $maxBitrateDl;
+            }
+
+            if ($maxBitrateUl) {
+                $commands[] = '=max-limit-at-up=' . $maxBitrateUl;
+            }
+
+            $result = $this->sendCommand($commands);
+            $this->disconnect();
+
+            if ($result) {
+                \Log::info("PPPoE user added: {$username}");
+                return ['success' => true, 'message' => 'User created'];
+            }
+
+            return ['success' => false, 'message' => 'Failed to create user'];
+
+        } catch (\Exception $e) {
+            $this->disconnect();
+            \Log::error("MikroTik add user error: " . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Set bandwidth limit for user
+     */
+    public function setBandwidthLimit($username, $downloadLimit, $uploadLimit)
+    {
+        try {
+            if (!$this->connect()) {
+                return ['success' => false, 'message' => 'Connection failed'];
+            }
+
+            // Format limits: "256k" or "1M" or "0" for unlimited
+            $dlLimit = $this->formatBandwidth($downloadLimit);
+            $ulLimit = $this->formatBandwidth($uploadLimit);
+
+            $commands = [
+                '/queue/simple',
+                'add',
+                '=name=' . $username,
+                '=target=' . $username,
+                '=max-packet-queue=25',
+                '=limit-at-down=' . $dlLimit,
+                '=limit-at-up=' . $ulLimit,
+                '=max-limit-down=' . $dlLimit,
+                '=max-limit-up=' . $ulLimit,
+                '=burst-limit-down=' . $dlLimit,
+                '=burst-limit-up=' . $ulLimit,
+                '=burst-time-down=5s',
+                '=burst-time-up=5s',
+            ];
+
+            $result = $this->sendCommand($commands);
+            $this->disconnect();
+
+            if ($result) {
+                \Log::info("Bandwidth limit set for {$username}: DL={$dlLimit} UL={$ulLimit}");
+                return ['success' => true, 'message' => 'Bandwidth limit applied'];
+            }
+
+            return ['success' => false, 'message' => 'Failed to set limit'];
+
+        } catch (\Exception $e) {
+            $this->disconnect();
+            \Log::error("MikroTik set limit error: " . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Disconnect user (drop active connection)
+     */
+    public function disconnectUser($username)
+    {
+        try {
+            if (!$this->connect()) {
+                return ['success' => false, 'message' => 'Connection failed'];
+            }
+
+            // Find active PPPoE connection
+            $commands = [
+                '/interface/pppoe-server/monitor',
+                'print',
+                '?name=' . $username,
+            ];
+
+            $result = $this->sendCommand($commands);
+            $this->disconnect();
+
+            if ($result) {
+                \Log::info("User disconnected: {$username}");
+                return ['success' => true, 'message' => 'User disconnected'];
+            }
+
+            return ['success' => false, 'message' => 'Failed to disconnect'];
+
+        } catch (\Exception $e) {
+            $this->disconnect();
+            \Log::error("MikroTik disconnect error: " . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Format bandwidth value
+     */
+    private function formatBandwidth($bitrate)
+    {
+        if ($bitrate === 0 || $bitrate === null) {
+            return '0';
+        }
+
+        if ($bitrate >= 1000000) {
+            return round($bitrate / 1000000) . 'M';
+        } elseif ($bitrate >= 1000) {
+            return round($bitrate / 1000) . 'k';
+        }
+
+        return (int) $bitrate;
+    }
+
+    /**
+     * Apply package speed limits
+     */
+    public function applyPackageLimit($username, $packageId)
+    {
+        try {
+            $package = \App\Models\Package::find($packageId);
+
+            if (!$package) {
+                return ['success' => false, 'message' => 'Package not found'];
+            }
+
+            // Convert speed from Mbps to bps
+            $speedBps = $package->speed_limit * 1024 * 1024;
+
+            return $this->setBandwidthLimit($username, $speedBps, $speedBps);
+
+        } catch (\Exception $e) {
+            \Log::error("Apply package limit error: " . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Get active PPPoE sessions
+     */
+    public function getActiveSessions()
+    {
+        try {
+            if (!$this->connect()) {
+                return ['success' => false, 'sessions' => []];
+            }
+
+            $commands = [
+                '/interface/pppoe-server/monitor',
+                'print',
+            ];
+
+            $result = $this->sendCommand($commands);
+            $this->disconnect();
+
+            return ['success' => true, 'sessions' => $result ?: []];
+
+        } catch (\Exception $e) {
+            $this->disconnect();
+            \Log::error("MikroTik get sessions error: " . $e->getMessage());
+            return ['success' => false, 'sessions' => []];
+        }
+    }
+
+    /**
+     * Send command via socket
+     */
+    private function sendCommand($commands)
+    {
+        try {
+            foreach ($commands as $command) {
+                $this->sendWord($command);
+            }
+
+            $response = [];
+            while (true) {
+                $word = $this->readWord();
+
+                if ($word === '!done') {
+                    break;
+                }
+
+                if ($word === '!tag') {
+                    $tag = $this->readWord();
+                }
+
+                if (str_starts_with($word, '.')) {
+                    $key = substr($word, 1);
+                    $value = $this->readWord();
+                    $response[$key] = $value;
+                }
+            }
+
+            return $response;
+
+        } catch (\Exception $e) {
+            \Log::error("Command execution error: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Send word to socket
+     */
+    private function sendWord($word)
+    {
+        $length = strlen($word);
+        $lengthStr = $this->encodeLength($length);
+
+        $data = $lengthStr . $word;
+        $sent = socket_write($this->socket, $data, strlen($data));
+
+        if ($sent === false) {
+            throw new \Exception("Cannot send word: {$word}");
+        }
+    }
+
+    /**
+     * Read word from socket
+     */
+    private function readWord()
+    {
+        $lengthStr = socket_read($this->socket, 1);
+
+        if ($lengthStr === false || strlen($lengthStr) === 0) {
+            throw new \Exception("Cannot read word");
+        }
+
+        $length = $this->decodeLength($lengthStr);
+        $word = socket_read($this->socket, $length);
+
+        if ($word === false) {
+            throw new \Exception("Cannot read word data");
+        }
+
+        return $word;
+    }
+
+    /**
+     * Encode length for MikroTik protocol
+     */
+    private function encodeLength($length)
+    {
+        if ($length < 0x80) {
+            return chr($length);
+        } elseif ($length < 0x4000) {
+            return chr((($length >> 8) | 0x80)) . chr($length & 0xFF);
+        } elseif ($length < 0x200000) {
+            return chr((($length >> 16) | 0xC0)) . chr(($length >> 8) & 0xFF) . chr($length & 0xFF);
+        }
+    }
+
+    /**
+     * Decode length from MikroTik protocol
+     */
+    private function decodeLength($firstByte)
+    {
+        $byte = ord($firstByte);
+
+        if (($byte & 0x80) === 0) {
+            return $byte;
+        } elseif (($byte & 0xC0) === 0x80) {
+            return ((($byte & 0x3F) << 8) + ord(socket_read($this->socket, 1)));
+        } elseif (($byte & 0xE0) === 0xC0) {
+            return ((($byte & 0x1F) << 16) + (ord(socket_read($this->socket, 1)) << 8) + ord(socket_read($this->socket, 1)));
+        }
+    }
+
+    /**
+     * Check if user connection exists
+     */
+    public function userIsConnected($username)
+    {
+        $sessions = $this->getActiveSessions();
+
+        if (!$sessions['success']) {
+            return false;
+        }
+
+        foreach ($sessions['sessions'] as $session) {
+            if (isset($session['name']) && $session['name'] === $username) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Block user (disable queue)
+     */
+    public function blockUser($username)
+    {
+        try {
+            if (!$this->connect()) {
+                return ['success' => false, 'message' => 'Connection failed'];
+            }
+
+            $commands = [
+                '/queue/simple',
+                'disable',
+                '=numbers=' . $username,
+            ];
+
+            $result = $this->sendCommand($commands);
+            $this->disconnect();
+
+            if ($result) {
+                \Log::warning("User blocked: {$username}");
+                return ['success' => true, 'message' => 'User blocked'];
+            }
+
+            return ['success' => false, 'message' => 'Failed to block user'];
+
+        } catch (\Exception $e) {
+            $this->disconnect();
+            \Log::error("MikroTik block user error: " . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Unblock user (enable queue)
+     */
+    public function unblockUser($username)
+    {
+        try {
+            if (!$this->connect()) {
+                return ['success' => false, 'message' => 'Connection failed'];
+            }
+
+            $commands = [
+                '/queue/simple',
+                'enable',
+                '=numbers=' . $username,
+            ];
+
+            $result = $this->sendCommand($commands);
+            $this->disconnect();
+
+            if ($result) {
+                \Log::info("User unblocked: {$username}");
+                return ['success' => true, 'message' => 'User unblocked'];
+            }
+
+            return ['success' => false, 'message' => 'Failed to unblock user'];
+
+        } catch (\Exception $e) {
+            $this->disconnect();
+            \Log::error("MikroTik unblock user error: " . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Test connection to MikroTik
+     */
+    public function testConnection()
+    {
+        try {
+            if (!$this->connect()) {
+                return false;
+            }
+
+            $this->disconnect();
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+}
     }
 
     /**

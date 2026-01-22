@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Users, Package, CreditCard, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Wifi, Download, Upload, Clock } from 'lucide-react';
 import AdminLayout from './AdminLayout';
+import { BandwidthChart, TopUsersChart, HourlyBandwidthChart, SessionsChart } from './BandwidthCharts';
 
 function AdminDashboard({ admin, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -8,6 +9,9 @@ function AdminDashboard({ admin, onLogout }) {
   const [packages, setPackages] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [stats, setStats] = useState(null);
+  const [bandwidthData, setBandwidthData] = useState([]);
+  const [hourlyData, setHourlyData] = useState([]);
+  const [sessionsChartData, setSessionsChartData] = useState([]);
 
   useEffect(() => {
     // Mock data
@@ -38,6 +42,31 @@ function AdminDashboard({ admin, onLogout }) {
       total_gb: 1832.47,
       avg_session_duration: 3600,
     });
+
+    // Generate sample bandwidth chart data
+    const bandwidth = Array.from({ length: 24 }, (_, i) => ({
+      time: `${i}:00`,
+      download: Math.floor(Math.random() * 50) + 20,
+      upload: Math.floor(Math.random() * 30) + 10,
+    }));
+    setBandwidthData(bandwidth);
+
+    // Generate hourly data
+    const hourly = Array.from({ length: 24 }, (_, i) => ({
+      hour: i,
+      bandwidth: Math.floor(Math.random() * 100) + 50,
+      peak: Math.floor(Math.random() * 150) + 80,
+    }));
+    setHourlyData(hourly);
+
+    // Generate sessions chart data
+    const sessionsData = Array.from({ length: 7 }, (_, i) => ({
+      date: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
+      active: Math.floor(Math.random() * 200) + 400,
+      completed: Math.floor(Math.random() * 300) + 200,
+      failed: Math.floor(Math.random() * 50) + 10,
+    }));
+    setSessionsChartData(sessionsData);
   }, []);
 
   const renderDashboard = () => (
@@ -413,28 +442,28 @@ function AdminDashboard({ admin, onLogout }) {
         </div>
       </div>
 
+      {/* 24-Hour Bandwidth Chart */}
+      <div className="chart-container">
+        <h3>24-Hour Bandwidth Usage</h3>
+        <BandwidthChart data={bandwidthData} />
+      </div>
+
+      {/* Hourly Traffic Chart */}
+      <div className="chart-container">
+        <h3>Hourly Traffic & Peak Analysis</h3>
+        <HourlyBandwidthChart data={hourlyData} />
+      </div>
+
       {/* Top Users by Bandwidth */}
       <div className="users-by-bandwidth">
         <h3>Top 5 Users by Bandwidth</h3>
-        <div className="user-bandwidth-list">
-          {[
-            { username: 'rajib', usage: 5.2, percentage: 85 },
-            { username: 'karim', usage: 4.8, percentage: 78 },
-            { username: 'fatima', usage: 3.2, percentage: 52 },
-            { username: 'user04', usage: 2.1, percentage: 34 },
-            { username: 'user05', usage: 1.9, percentage: 31 },
-          ].map((user) => (
-            <div key={user.username} className="user-bandwidth-item">
-              <div className="user-info">
-                <span>{user.username}</span>
-                <strong>{user.usage} GB</strong>
-              </div>
-              <div className="bandwidth-indicator">
-                <div className="bar" style={{width: user.percentage + '%'}}></div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <TopUsersChart data={[
+          { username: 'rajib', usage: 5.2, remaining: 94.8 },
+          { username: 'karim', usage: 4.8, remaining: 95.2 },
+          { username: 'fatima', usage: 3.2, remaining: 96.8 },
+          { username: 'user04', usage: 2.1, remaining: 97.9 },
+          { username: 'user05', usage: 1.9, remaining: 98.1 },
+        ]} />
       </div>
     </div>
   );
