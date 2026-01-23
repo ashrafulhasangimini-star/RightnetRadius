@@ -1,191 +1,251 @@
-import { useState } from 'react'
+import React, { useState } from 'react';
+import { Mail, Lock, Eye, EyeOff, Wifi, AlertCircle } from 'lucide-react';
+import { Input } from '../components/ui/FormElements';
+import { Button } from '../components/ui/Button';
 
 export default function LoginPage({ onLogin }) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [userType, setUserType] = useState('admin')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError('');
+    setLoading(true);
 
     try {
-      // Demo credentials validation
-      const validCredentials = {
-        admin: { password: 'password', email: 'admin@rightnetradius.local' },
-        user1: { password: 'password', email: 'user1@example.com' },
-        user2: { password: 'password', email: 'user2@example.com' },
-        user3: { password: 'password', email: 'user3@example.com' },
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        onLogin(data.user);
+      } else {
+        setError(data.message || 'Login failed. Please check your credentials.');
       }
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Check credentials
-      if (!validCredentials[username] || validCredentials[username].password !== password) {
-        setError('Invalid credentials. Try admin/password or user1/password')
-        setLoading(false)
-        return
-      }
-
-      // Successful login
-      onLogin(
-        {
-          id: Math.random(),
-          username: username,
-          email: validCredentials[username].email,
-          name: username.charAt(0).toUpperCase() + username.slice(1),
-        },
-        userType
-      )
     } catch (err) {
-      setError('An error occurred. Please try again.')
-      console.error(err)
-      setLoading(false)
+      console.error('Login error:', err);
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}
-    >
-      <div
-        style={{
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-          padding: '40px',
-          width: '100%',
-          maxWidth: '400px',
-        }}
-      >
-        <h1 style={{ textAlign: 'center', color: '#333', marginBottom: '30px', fontSize: '28px' }}>
-          🌐 RightnetRadius
-        </h1>
-        <p style={{ textAlign: 'center', color: '#666', marginBottom: '30px' }}>
-          ISP Management & RADIUS Server
-        </p>
-
-        {error && (
-          <div style={{
-            background: '#fee',
-            color: '#c33',
-            padding: '12px',
-            borderRadius: '6px',
-            marginBottom: '20px',
-            fontSize: '14px',
-          }}>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontWeight: 'bold' }}>
-              Username
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '6px',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-              }}
-            />
+    <div className="min-h-screen flex">
+      {/* Left Side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary to-secondary items-center justify-center p-12">
+        <div className="max-w-md text-white space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white bg-opacity-20 backdrop-blur-sm">
+              <Wifi className="text-white" size={32} />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold">RightnetRadius</h1>
+              <p className="text-white text-opacity-90">ISP Management System</p>
+            </div>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontWeight: 'bold' }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '6px',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-              }}
-            />
+          <div className="space-y-4 pt-8">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white bg-opacity-20 flex-shrink-0 mt-1">
+                <span className="text-white font-bold">1</span>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-1">Real-time Monitoring</h3>
+                <p className="text-white text-opacity-80 text-sm">
+                  Monitor bandwidth usage and active sessions in real-time with live updates
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white bg-opacity-20 flex-shrink-0 mt-1">
+                <span className="text-white font-bold">2</span>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-1">User Management</h3>
+                <p className="text-white text-opacity-80 text-sm">
+                  Easily manage users, packages, and access controls from one dashboard
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white bg-opacity-20 flex-shrink-0 mt-1">
+                <span className="text-white font-bold">3</span>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-1">RADIUS Integration</h3>
+                <p className="text-white text-opacity-80 text-sm">
+                  Seamless integration with FreeRADIUS for authentication and accounting
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div className="flex-1 flex items-center justify-center p-8 bg-whiten dark:bg-boxdark-2">
+        <div className="w-full max-w-md">
+          {/* Mobile Logo */}
+          <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary">
+              <Wifi className="text-white" size={24} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-black dark:text-white">RightnetRadius</h1>
+              <p className="text-body text-sm">ISP Management System</p>
+            </div>
           </div>
 
-          <div style={{ marginBottom: '30px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontWeight: 'bold' }}>
-              Login As
-            </label>
-            <select
-              value={userType}
-              onChange={(e) => setUserType(e.target.value)}
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #ddd',
-                borderRadius: '6px',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-              }}
-            >
-              <option value="admin">Admin</option>
-              <option value="customer">Customer</option>
-            </select>
+          <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+            <div className="border-b border-stroke py-4 px-6.5 dark:border-strokedark">
+              <h3 className="font-medium text-black dark:text-white text-xl">
+                Sign In to Your Account
+              </h3>
+              <p className="text-sm text-body mt-1">
+                Enter your credentials to access the dashboard
+              </p>
+            </div>
+
+            <div className="p-6.5">
+              {error && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-danger bg-danger bg-opacity-10 p-4">
+                  <AlertCircle className="text-danger flex-shrink-0" size={20} />
+                  <p className="text-sm text-danger">{error}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Username or Email
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Enter your username"
+                      className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-12 pr-6 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                      required
+                    />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2">
+                      <Mail className="text-body" size={20} />
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className="w-full rounded-lg border border-stroke bg-transparent py-4 pl-12 pr-12 text-black outline-none focus:border-primary focus-visible:shadow-none dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
+                      required
+                    />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2">
+                      <Lock className="text-body" size={20} />
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-body hover:text-primary"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="flex cursor-pointer select-none items-center">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        onChange={() => {}}
+                      />
+                      <div className="box mr-3 flex h-5 w-5 items-center justify-center rounded border border-primary">
+                        <span className="text-primary opacity-0">
+                          <svg
+                            className="fill-current"
+                            width="11"
+                            height="8"
+                            viewBox="0 0 11 8"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M10.0915 0.951972L10.0867 0.946075L10.0813 0.940568C9.90076 0.753564 9.61034 0.753146 9.42927 0.939309L4.16201 6.22962L1.58507 3.63469C1.40401 3.44841 1.11351 3.44879 0.932892 3.63584C0.755703 3.81933 0.755703 4.10875 0.932892 4.29224L0.932878 4.29225L0.934851 4.29424L3.58046 6.95832C3.73676 7.11955 3.94983 7.2 4.1473 7.2C4.36196 7.2 4.55963 7.11773 4.71406 6.9584L10.0468 1.60234C10.2436 1.4199 10.2421 1.1339 10.0915 0.951972Z"
+                              fill=""
+                              stroke=""
+                              strokeWidth="0.4"
+                            ></path>
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-sm text-body">Remember me</span>
+                  </label>
+
+                  <button
+                    type="button"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Signing In...
+                    </span>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+
+                <div className="text-center">
+                  <p className="text-sm text-body">
+                    Don't have an account?{' '}
+                    <button
+                      type="button"
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Contact Administrator
+                    </button>
+                  </p>
+                </div>
+              </form>
+            </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading || !username || !password}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: loading ? '#999' : '#667eea',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'background 0.3s',
-            }}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-
-        <div style={{ marginTop: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '6px', fontSize: '12px' }}>
-          <p style={{ margin: '5px 0', color: '#666' }}>
-            <strong>Demo Credentials:</strong>
-          </p>
-          <p style={{ margin: '5px 0', color: '#666' }}>
-            Admin: admin / password
-          </p>
-          <p style={{ margin: '5px 0', color: '#666' }}>
-            Customer: user1 / password
+          <p className="mt-6 text-center text-sm text-body">
+            © 2024 RightnetRadius. All rights reserved.
           </p>
         </div>
       </div>
     </div>
-  )
+  );
 }

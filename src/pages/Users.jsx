@@ -1,15 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { UserPlus, Search, Edit2, Trash2, Eye, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardBody } from '../components/ui/Card';
+import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '../components/ui/Table';
+import { Button } from '../components/ui/Button';
+import { Input, Select } from '../components/ui/FormElements';
+import { Badge, StatusBadge } from '../components/ui/Badge';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     package: 'basic',
     bandwidth: '5M',
+    password: '',
   });
 
   useEffect(() => {
@@ -23,15 +33,14 @@ const Users = () => {
       const response = await fetch('/api/users', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await response.json();
       
-      // Mock data
+      // Mock data for demonstration
       setUsers([
-        { id: 1, username: 'rajib.khan', email: 'rajib@example.com', package: 'Premium', bandwidth: '10M', status: 'active', quota_used: 45.2 },
-        { id: 2, username: 'karim.ahmed', email: 'karim@example.com', package: 'Standard', bandwidth: '5M', status: 'active', quota_used: 67.8 },
-        { id: 3, username: 'fatima.islam', email: 'fatima@example.com', package: 'Basic', bandwidth: '2M', status: 'inactive', quota_used: 12.3 },
-        { id: 4, username: 'ali.hassan', email: 'ali@example.com', package: 'Premium', bandwidth: '20M', status: 'active', quota_used: 89.5 },
-        { id: 5, username: 'noor.aman', email: 'noor@example.com', package: 'Standard', bandwidth: '5M', status: 'blocked', quota_used: 100 },
+        { id: 1, username: 'rajib.khan', email: 'rajib@example.com', package: 'Premium', bandwidth: '10M', status: 'active', quota_used: 45.2, created_at: '2024-01-15' },
+        { id: 2, username: 'karim.ahmed', email: 'karim@example.com', package: 'Standard', bandwidth: '5M', status: 'active', quota_used: 67.8, created_at: '2024-01-10' },
+        { id: 3, username: 'fatima.islam', email: 'fatima@example.com', package: 'Basic', bandwidth: '2M', status: 'inactive', quota_used: 12.3, created_at: '2024-01-05' },
+        { id: 4, username: 'ali.hassan', email: 'ali@example.com', package: 'Premium', bandwidth: '20M', status: 'active', quota_used: 89.5, created_at: '2024-01-20' },
+        { id: 5, username: 'noor.aman', email: 'noor@example.com', package: 'Standard', bandwidth: '5M', status: 'suspended', quota_used: 100, created_at: '2024-01-08' },
       ]);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -54,200 +63,322 @@ const Users = () => {
       });
 
       if (response.ok) {
-        setFormData({ username: '', email: '', package: 'basic', bandwidth: '5M' });
+        setFormData({ username: '', email: '', package: 'basic', bandwidth: '5M', password: '' });
         setShowForm(false);
         fetchUsers();
         alert('User added successfully!');
       }
     } catch (error) {
-      alert('Error adding user: ' + error.message);
+      console.error('Error adding user:', error);
+      alert('Failed to add user');
     }
   };
 
-  const handleDisconnect = async (username) => {
-    if (!confirm(`Disconnect ${username}?`)) return;
-    
+  const handleDeleteUser = async (userId) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+
     try {
       const token = localStorage.getItem('token');
-      await fetch(`/api/bandwidth/disconnect`, {
-        method: 'POST',
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        fetchUsers();
+        alert('User deleted successfully!');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Failed to delete user');
+    }
+  };
+
+  const handleToggleStatus = async (userId, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/users/${userId}/status`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ status: newStatus }),
       });
-      alert(`${username} disconnected`);
-      fetchUsers();
+
+      if (response.ok) {
+        fetchUsers();
+      }
     } catch (error) {
-      alert('Error: ' + error.message);
+      console.error('Error updating user status:', error);
     }
   };
 
-  const handleBlockUser = async (username) => {
-    try {
-      const token = localStorage.getItem('token');
-      await fetch(`/api/bandwidth/block`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ username }),
-      });
-      alert(`${username} blocked`);
-      fetchUsers();
-    } catch (error) {
-      alert('Error: ' + error.message);
-    }
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  const getQuotaColor = (quotaUsed) => {
+    if (quotaUsed >= 90) return 'text-danger';
+    if (quotaUsed >= 70) return 'text-warning';
+    return 'text-success';
   };
 
   if (loading) {
-    return <div className="p-8 text-center">Loading users...</div>;
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   return (
-    <div className="p-8 bg-gray-50">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Users Management</h1>
-            <p className="text-gray-600 mt-1">{users.length} users in system</p>
-          </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            + Add User
-          </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-title-md2 font-semibold text-black dark:text-white">
+            User Management
+          </h2>
+          <p className="text-body mt-1">Manage all system users and their access</p>
         </div>
+        <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+          <UserPlus size={20} />
+          Add New User
+        </Button>
+      </div>
 
-        {/* Add User Form */}
-        {showForm && (
-          <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
-            <h2 className="text-xl font-bold mb-4">Add New User</h2>
+      {/* Add User Form */}
+      {showForm && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Add New User</CardTitle>
+          </CardHeader>
+          <CardBody>
             <form onSubmit={handleAddUser} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Username"
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Input
+                  label="Username"
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   required
-                  className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <input
+                <Input
+                  label="Email"
                   type="email"
-                  placeholder="Email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
-                  className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <select
+                <Input
+                  label="Password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                />
+                <Select
+                  label="Package"
                   value={formData.package}
                   onChange={(e) => setFormData({ ...formData, package: e.target.value })}
-                  className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="basic">Basic</option>
-                  <option value="standard">Standard</option>
-                  <option value="premium">Premium</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="Bandwidth (e.g., 5M)"
-                  value={formData.bandwidth}
-                  onChange={(e) => setFormData({ ...formData, bandwidth: e.target.value })}
-                  className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  options={[
+                    { value: 'basic', label: 'Basic - 2M' },
+                    { value: 'standard', label: 'Standard - 5M' },
+                    { value: 'premium', label: 'Premium - 10M' },
+                  ]}
                 />
               </div>
-              <div className="flex gap-4">
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-                >
-                  Create User
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="px-6 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition"
-                >
+              <div className="flex gap-3 justify-end">
+                <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
                   Cancel
-                </button>
+                </Button>
+                <Button type="submit">Create User</Button>
               </div>
             </form>
-          </div>
-        )}
+          </CardBody>
+        </Card>
+      )}
 
-        {/* Users Table */}
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-100 border-b">
-              <tr>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700">Username</th>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700">Email</th>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700">Package</th>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700">Bandwidth</th>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700">Quota Used</th>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700">Status</th>
-                <th className="px-6 py-4 text-left font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className="border-b hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 font-medium text-gray-900">{user.username}</td>
-                  <td className="px-6 py-4 text-gray-600">{user.email}</td>
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                      {user.package}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">{user.bandwidth}</td>
-                  <td className="px-6 py-4">
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${user.quota_used}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-xs text-gray-600 mt-1 block">{user.quota_used.toFixed(1)}%</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      user.status === 'active' ? 'bg-green-100 text-green-800' :
-                      user.status === 'blocked' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleDisconnect(user.username)}
-                        className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
-                        title="Disconnect user"
-                      >
-                        Disconnect
-                      </button>
-                      <button
-                        onClick={() => handleBlockUser(user.username)}
-                        className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-                        title="Block user"
-                      >
-                        {user.status === 'blocked' ? 'Unblock' : 'Block'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Filters */}
+      <Card>
+        <CardBody>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1 max-w-md">
+              <Input
+                icon={Search}
+                placeholder="Search users by username or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              options={[
+                { value: 'all', label: 'All Status' },
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'suspended', label: 'Suspended' },
+              ]}
+              className="w-full sm:w-48"
+            />
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Users Table */}
+      <Card padding={false}>
+        <div className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Package</TableHead>
+                <TableHead>Bandwidth</TableHead>
+                <TableHead>Quota Used</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div>
+                        <p className="text-black dark:text-white font-medium">
+                          {user.username}
+                        </p>
+                        <p className="text-sm text-body">{user.email}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="primary">{user.package}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-body">{user.bandwidth}</p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="w-full max-w-24 h-2 bg-gray-2 rounded-full overflow-hidden dark:bg-meta-4">
+                          <div
+                            className={`h-full ${
+                              user.quota_used >= 90 ? 'bg-danger' :
+                              user.quota_used >= 70 ? 'bg-warning' : 'bg-success'
+                            }`}
+                            style={{ width: `${user.quota_used}%` }}
+                          />
+                        </div>
+                        <span className={`text-sm font-medium ${getQuotaColor(user.quota_used)}`}>
+                          {user.quota_used}%
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={user.status} />
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-body text-sm">{user.created_at}</p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setShowViewModal(true);
+                          }}
+                          className="hover:text-primary"
+                          title="View Details"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleToggleStatus(user.id, user.status)}
+                          className={`hover:${user.status === 'active' ? 'text-danger' : 'text-success'}`}
+                          title={user.status === 'active' ? 'Deactivate' : 'Activate'}
+                        >
+                          {user.status === 'active' ? <XCircle size={18} /> : <CheckCircle size={18} />}
+                        </button>
+                        <button
+                          onClick={() => setSelectedUser(user)}
+                          className="hover:text-warning"
+                          title="Edit"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="hover:text-danger"
+                          title="Delete"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center">
+                    <p className="text-body py-8">No users found</p>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
-      </div>
+      </Card>
+
+      {/* View User Modal */}
+      {showViewModal && selectedUser && (
+        <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black bg-opacity-50">
+          <Card className="w-full max-w-lg mx-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>User Details</CardTitle>
+                <button onClick={() => setShowViewModal(false)}>
+                  <XCircle size={24} />
+                </button>
+              </div>
+            </CardHeader>
+            <CardBody className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-body">Username</p>
+                  <p className="font-medium text-black dark:text-white">{selectedUser.username}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-body">Email</p>
+                  <p className="font-medium text-black dark:text-white">{selectedUser.email}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-body">Package</p>
+                  <Badge variant="primary">{selectedUser.package}</Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-body">Status</p>
+                  <StatusBadge status={selectedUser.status} />
+                </div>
+                <div>
+                  <p className="text-sm text-body">Bandwidth</p>
+                  <p className="font-medium text-black dark:text-white">{selectedUser.bandwidth}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-body">Quota Used</p>
+                  <p className={`font-medium ${getQuotaColor(selectedUser.quota_used)}`}>
+                    {selectedUser.quota_used}%
+                  </p>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

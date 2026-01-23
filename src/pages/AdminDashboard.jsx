@@ -1,138 +1,164 @@
-import { useState } from 'react'
-import Dashboard from './Dashboard'
-import Users from './Users'
-import AuditLogs from './AuditLogs'
-import AdminPanel from './AdminPanel'
+import React, { useState } from 'react';
+import { 
+  LayoutDashboard, 
+  Users, 
+  FileText, 
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  ChevronDown
+} from 'lucide-react';
+import Dashboard from './Dashboard';
+import UsersPage from './Users';
+import AuditLogs from './AuditLogs';
+import AdminPanel from './AdminPanel';
 
 export default function AdminDashboard({ admin, onLogout }) {
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard />
+        return <Dashboard />;
       case 'users':
-        return <Users />
+        return <UsersPage />;
       case 'audit':
-        return <AuditLogs />
+        return <AuditLogs />;
       case 'admin':
-        return <AdminPanel />
+        return <AdminPanel />;
       default:
-        return <Dashboard />
+        return <Dashboard />;
     }
-  }
+  };
 
   const menuItems = [
-    { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
-    { id: 'users', label: '👥 Users', icon: '👥' },
-    { id: 'audit', label: '📋 Audit Logs', icon: '📋' },
-    { id: 'admin', label: '⚙️ Admin Panel', icon: '⚙️' },
-  ]
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'users', label: 'Users', icon: Users },
+    { id: 'audit', label: 'Audit Logs', icon: FileText },
+    { id: 'admin', label: 'Admin Panel', icon: Settings },
+  ];
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#f5f7fa' }}>
+    <div className="dark:bg-boxdark-2 dark:text-bodydark">
       {/* Sidebar */}
-      <div
-        style={{
-          width: '264px',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: '20px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          display: 'flex',
-          flexDirection: 'column',
-          color: 'white',
-        }}
+      <aside
+        className={`fixed left-0 top-0 z-9999 flex h-screen w-72.5 flex-col overflow-y-hidden bg-black duration-300 ease-linear dark:bg-boxdark lg:static lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
       >
-        <h2 style={{ margin: '0 0 30px 0', fontSize: '20px', fontWeight: 'bold' }}>
-          🌐 RightnetRadius
-        </h2>
+        {/* Sidebar Header */}
+        <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
+          <a href="/" className="flex items-center gap-3">
+            <Wifi className="text-primary" size={32} />
+            <span className="text-xl font-bold text-white">RightnetRadius</span>
+          </a>
 
-        <nav style={{ flex: 1 }}>
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                margin: '8px 0',
-                background: activeTab === item.id ? 'rgba(255,255,255,0.2)' : 'transparent',
-                border: 'none',
-                borderRadius: '6px',
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: activeTab === item.id ? 'bold' : 'normal',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.3s',
-              }}
-              onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
-              onMouseLeave={(e) =>
-                (e.target.style.background = activeTab === item.id ? 'rgba(255,255,255,0.2)' : 'transparent')
-              }
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '20px' }}>
-          <div style={{ fontSize: '12px', marginBottom: '12px' }}>
-            👤 {admin.name || admin.username}
-          </div>
           <button
-            onClick={onLogout}
-            style={{
-              width: '100%',
-              padding: '10px 16px',
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              borderRadius: '6px',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '14px',
-              transition: 'all 0.3s',
-            }}
-            onMouseEnter={(e) => (e.target.style.background = 'rgba(255,255,255,0.3)')}
-            onMouseLeave={(e) => (e.target.style.background = 'rgba(255,255,255,0.2)')}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="block lg:hidden"
           >
-            🚪 Logout
+            <X className="text-white" size={24} />
           </button>
         </div>
-      </div>
 
-      {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Top Bar */}
-        <div
-          style={{
-            padding: '20px',
-            background: 'white',
-            borderBottom: '1px solid #e0e0e0',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}
-        >
-          <h1 style={{ margin: 0, fontSize: '24px', color: '#333' }}>
-            {menuItems.find((item) => item.id === activeTab)?.label || 'Dashboard'}
-          </h1>
-          <div style={{ fontSize: '14px', color: '#666' }}>
-            {new Date().toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
+        {/* Sidebar Menu */}
+        <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
+          <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
+            <div>
+              <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">MENU</h3>
+
+              <ul className="mb-6 flex flex-col gap-1.5">
+                {menuItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.id}>
+                      <button
+                        onClick={() => setActiveTab(item.id)}
+                        className={`group relative flex w-full items-center gap-2.5 rounded-sm px-4 py-2 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+                          activeTab === item.id && 'bg-graydark dark:bg-meta-4'
+                        }`}
+                      >
+                        <Icon size={18} />
+                        {item.label}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </nav>
+        </div>
+
+        {/* User Profile Section */}
+        <div className="mt-auto border-t border-strokedark px-6 py-4">
+          <div className="relative">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex w-full items-center gap-3 rounded-sm py-2 px-3 hover:bg-graydark dark:hover:bg-meta-4"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white font-bold">
+                {admin.name?.[0] || admin.username?.[0] || 'A'}
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-white">{admin.name || admin.username}</p>
+                <p className="text-xs text-bodydark2">{admin.email || 'Administrator'}</p>
+              </div>
+              <ChevronDown
+                className={`text-bodydark2 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                size={20}
+              />
+            </button>
+
+            {/* User Dropdown */}
+            {userMenuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 rounded-sm border border-strokedark bg-boxdark shadow-default">
+                <button
+                  onClick={onLogout}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm text-bodydark1 hover:bg-graydark"
+                >
+                  <LogOut size={18} />
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
+      </aside>
 
-        {/* Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+      {/* Main Content Area */}
+      <div className="relative flex flex-1 flex-col lg:ml-72.5">
+        {/* Header */}
+        <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
+          <div className="flex flex-grow items-center justify-between py-4 px-4 shadow-2 md:px-6 2xl:px-11">
+            <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="z-99999 block rounded-sm border border-stroke bg-white p-1.5 shadow-sm dark:border-strokedark dark:bg-boxdark lg:hidden"
+              >
+                <Menu size={24} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <h1 className="text-title-md2 font-semibold text-black dark:text-white">
+                {menuItems.find(item => item.id === activeTab)?.label || 'Dashboard'}
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Additional header items can go here */}
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 w-full">
           {renderContent()}
-        </div>
+        </main>
       </div>
     </div>
-  )
+  );
 }
