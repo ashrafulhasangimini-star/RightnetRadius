@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import LoginPage from './LoginPage'
-import AdminDashboard from './components/AdminDashboard'
-import CustomerDashboard from './components/CustomerDashboard'
+import LoginPage from './pages/LoginPage'
+import AdminDashboard from './pages/AdminDashboard'
+import CustomerDashboard from './pages/CustomerDashboard'
 
 function App() {
   const [user, setUser] = useState(null)

@@ -48,38 +48,46 @@ Route::get('admin-users', function () {
 });
 
 Route::middleware('api')->group(function () {
+    // Authentication
+    Route::post('auth/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
+    Route::post('auth/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout']);
+    
     // RADIUS Authentication & Sessions
-    Route::post('radius/authenticate', [RadiusController::class, 'authenticate']);
-    Route::post('radius/logout', [RadiusController::class, 'logout']);
+    Route::post('radius/authenticate', [\App\Http\Controllers\Api\RadiusAuthController::class, 'authenticate']);
+    Route::post('accounting/start', [\App\Http\Controllers\Api\RadiusAuthController::class, 'accountingStart']);
+    Route::post('accounting/interim', [\App\Http\Controllers\Api\RadiusAuthController::class, 'accountingInterim']);
+    Route::post('accounting/stop', [\App\Http\Controllers\Api\RadiusAuthController::class, 'accountingStop']);
+    Route::get('bandwidth/quota/{username}', [\App\Http\Controllers\Api\RadiusAuthController::class, 'checkQuota']);
+    
+    // Bandwidth Management
+    Route::get('bandwidth/usage', [\App\Http\Controllers\Api\BandwidthController::class, 'getUsage']);
+    Route::get('bandwidth/history', [\App\Http\Controllers\Api\BandwidthController::class, 'getHistory']);
+    Route::get('bandwidth/top-users', [\App\Http\Controllers\Api\BandwidthController::class, 'getTopUsers']);
+    Route::post('bandwidth/limit', [\App\Http\Controllers\Api\BandwidthController::class, 'setLimit']);
+    Route::post('bandwidth/block', [\App\Http\Controllers\Api\BandwidthController::class, 'blockUser']);
+    Route::post('bandwidth/unblock', [\App\Http\Controllers\Api\BandwidthController::class, 'unblockUser']);
+    Route::post('bandwidth/disconnect', [\App\Http\Controllers\Api\BandwidthController::class, 'disconnect']);
+    
+    // Audit Logs
+    Route::get('audit/logs', [\App\Http\Controllers\Api\AuditLogController::class, 'index']);
+    Route::get('audit/logs/filter', [\App\Http\Controllers\Api\AuditLogController::class, 'filter']);
+    Route::get('audit/logs/export', [\App\Http\Controllers\Api\AuditLogController::class, 'export']);
+    
+    // Customer Dashboard
+    Route::get('customer/dashboard', [\App\Http\Controllers\Api\CustomerController::class, 'dashboard']);
+    Route::get('customer/profile', [\App\Http\Controllers\Api\CustomerController::class, 'profile']);
+    Route::post('customer/profile/update', [\App\Http\Controllers\Api\CustomerController::class, 'updateProfile']);
+    
+    // Admin Configuration
+    Route::post('admin/config', [\App\Http\Controllers\Api\AdminController::class, 'saveConfig']);
+    Route::get('admin/config', [\App\Http\Controllers\Api\AdminController::class, 'getConfig']);
+    Route::get('admin/status', [\App\Http\Controllers\Api\AdminController::class, 'systemStatus']);
     
     // Session Management
-    Route::get('sessions', [SessionController::class, 'getActiveSessions']);
-    Route::get('sessions/stats', [SessionController::class, 'getStats']);
-    Route::get('sessions/{sessionId}', [SessionController::class, 'getSession']);
-    Route::post('sessions/{sessionId}/disconnect', [SessionController::class, 'disconnect']);
-    Route::post('sessions/{sessionId}/accounting', [SessionController::class, 'accounting']);
-    Route::get('bandwidth/usage', [SessionController::class, 'getBandwidthUsage']);
-    Route::get('bandwidth/quota/{username}', [SessionController::class, 'checkQuota']);
-    Route::post('accounting/start', [SessionController::class, 'accountingStart']);
-    Route::post('accounting/interim', [SessionController::class, 'accountingInterim']);
-    Route::post('accounting/stop', [SessionController::class, 'accountingStop']);
-    Route::get('users/{username}/sessions', [SessionController::class, 'getUserSessions']);
-    Route::post('users/{username}/disconnect-all', [SessionController::class, 'disconnectAll']);
-    Route::get('reports/sessions', [SessionController::class, 'getSessionReport']);
-    Route::get('reports/bandwidth', [SessionController::class, 'getBandwidthReport']);
-    
-    // Audit Logging
-    Route::get('audit-logs', [AuditLogController::class, 'index']);
-    Route::get('audit-logs/summary/{userId}', [AuditLogController::class, 'summary']);
-    Route::get('audit-logs/export', [AuditLogController::class, 'export']);
-    Route::get('audit-logs/auth-attempts', [AuditLogController::class, 'authAttempts']);
-    Route::get('audit-logs/quota-breaches', [AuditLogController::class, 'quotaBreaches']);
-    Route::get('audit-logs/admin-actions', [AuditLogController::class, 'adminActions']);
-    Route::get('audit-logs/stats', [AuditLogController::class, 'statistics']);
-    
-    // Authentication
-    Route::post('login', function() { return ['message' => 'Login endpoint']; });
-    Route::post('register', function() { return ['message' => 'Register endpoint']; });
+    Route::get('sessions', [\App\Http\Controllers\Api\SessionController::class, 'getActiveSessions']);
+    Route::get('sessions/stats', [\App\Http\Controllers\Api\SessionController::class, 'getStats']);
+    Route::get('users/{username}/sessions', [\App\Http\Controllers\Api\SessionController::class, 'getUserSessions']);
+    Route::post('users/{username}/disconnect-all', [\App\Http\Controllers\Api\SessionController::class, 'disconnectAll']);
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {
