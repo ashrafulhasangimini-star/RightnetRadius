@@ -89,6 +89,36 @@ Route::middleware('api')->group(function () {
     Route::get('users/{username}/sessions', [\App\Http\Controllers\Api\SessionController::class, 'getUserSessions']);
     Route::post('users/{username}/disconnect-all', [\App\Http\Controllers\Api\SessionController::class, 'disconnectAll']);
 
+    // FreeRADIUS Integration Routes
+    Route::prefix('freeradius')->group(function () {
+        // Configuration Management
+        Route::get('config', [\App\Http\Controllers\FreeRadiusController::class, 'getConfig']);
+        Route::put('config', [\App\Http\Controllers\FreeRadiusController::class, 'updateConfig']);
+        
+        // Server Status & Health Check
+        Route::get('status', [\App\Http\Controllers\FreeRadiusController::class, 'checkStatus']);
+        Route::get('diagnostics', [\App\Http\Controllers\FreeRadiusController::class, 'getDiagnostics']);
+        
+        // NAS Clients Management (RouterOS, WiFi Access Points, etc.)
+        Route::get('nas-clients', [\App\Http\Controllers\FreeRadiusController::class, 'getNasClients']);
+        Route::post('nas-clients', [\App\Http\Controllers\FreeRadiusController::class, 'addNasClient']);
+        Route::put('nas-clients/{id}', [\App\Http\Controllers\FreeRadiusController::class, 'updateNasClient']);
+        Route::delete('nas-clients/{id}', [\App\Http\Controllers\FreeRadiusController::class, 'deleteNasClient']);
+        
+        // RADIUS Users Management
+        Route::get('users', [\App\Http\Controllers\FreeRadiusController::class, 'getRadiusUsers']);
+        
+        // Export Functions (for FreeRADIUS server configuration)
+        Route::get('export/users', [\App\Http\Controllers\FreeRadiusController::class, 'exportRadiusUsers']);
+        Route::get('export/clients', [\App\Http\Controllers\FreeRadiusController::class, 'exportNasClients']);
+        
+        // Authentication Testing
+        Route::post('test-auth', [\App\Http\Controllers\FreeRadiusController::class, 'testAuthentication']);
+        
+        // Accounting Logs
+        Route::get('accounting-logs', [\App\Http\Controllers\FreeRadiusController::class, 'getAccountingLogs']);
+    });
+
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', function() { return ['message' => 'Logged out']; });

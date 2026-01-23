@@ -1,0 +1,47 @@
+# ============================================
+# FreeRADIUS এনভায়রনমেন্ট কনফিগারেশন
+# আপনার .env ফাইলে যোগ করুন
+# ============================================
+
+# FreeRADIUS সার্ভার সেটিংস
+FREERADIUS_ENABLED=true
+FREERADIUS_HOST=localhost
+FREERADIUS_PORT=1812
+FREERADIUS_ACCT_PORT=1813
+
+# শেয়ার্ড সিক্রেট (খুবই গুরুত্বপূর্ণ - শক্তিশালী করুন!)
+# বেসিক: testing123 (শুধুমাত্র ডেভেলপমেন্টের জন্য)
+# প্রোডাকশন: একটি শক্তিশালী র‍্যান্ডম স্ট্রিং ব্যবহার করুন (32+ অক্ষর)
+FREERADIUS_SHARED_SECRET=testing123
+
+# RADIUS টাইমআউট এবং রিট্রাই
+RADIUS_TIMEOUT=5
+RADIUS_RETRIES=3
+
+# অথেন্টিকেশন মেথড (pap, chap, eap)
+RADIUS_AUTH_METHOD=pap
+
+# NAS আইডেন্টিফায়ার
+NAS_IDENTIFIER=rightnet-radius
+NAS_IP=127.0.0.1
+
+# অ্যাকাউন্টিং সেটিংস
+RADIUS_ACCOUNTING_ENABLED=true
+ACCOUNTING_INTERIM_INTERVAL=300
+SESSION_TIMEOUT=3600
+
+# লগিং
+RADIUS_LOGGING=true
+RADIUS_LOG_CHANNEL=single
+
+# প্রোডাকশন কনফিগারেশনের উদাহরণ
+# ============================================
+# FREERADIUS_ENABLED=true
+# FREERADIUS_HOST=192.168.1.100
+# FREERADIUS_PORT=1812
+# FREERADIUS_ACCT_PORT=1813
+# FREERADIUS_SHARED_SECRET=your_very_strong_secret_key_32_chars_long!!!
+# RADIUS_TIMEOUT=10
+# RADIUS_RETRIES=5
+# RADIUS_ACCOUNTING_ENABLED=true
+# RADIUS_LOGGING=true

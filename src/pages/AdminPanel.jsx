@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import FreeRadiusManagement from './FreeRadiusManagement'
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('radius')
@@ -135,6 +136,7 @@ export default function AdminPanel() {
           { id: 'radius', label: '🔐 RADIUS Config', color: '#667eea' },
           { id: 'mikrotik', label: '🖥️ MikroTik Config', color: '#764ba2' },
           { id: 'system', label: '⚙️ System Settings', color: '#06b6d4' },
+          { id: 'freeradius', label: '📡 FreeRADIUS', color: '#10b981' },
           { id: 'status', label: '📊 System Status', color: '#f59e0b' },
         ].map((tab) => (
           <button
@@ -361,6 +363,13 @@ export default function AdminPanel() {
               ✅ Configuration saved successfully!
             </div>
           )}
+        </div>
+      )}
+
+      {/* FreeRADIUS Management */}
+      {activeTab === 'freeradius' && (
+        <div style={{ background: 'white', padding: '24px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <FreeRadiusManagement />
         </div>
       )}
 
