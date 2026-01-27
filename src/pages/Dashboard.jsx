@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Upload, Users, HardDrive, TrendingUp, TrendingDown, Activity } from 'lucide-react';
-import { useSessionUpdates, useBandwidthUpdates } from '../hooks/useWebSocket';
 import { BandwidthChart, TopUsersChart, HourlyBandwidthChart, SessionsChart } from '../components/BandwidthCharts';
 import StatCard from '../components/ui/StatCard';
 import { Card, CardHeader, CardTitle, CardBody } from '../components/ui/Card';
@@ -19,27 +18,6 @@ const Dashboard = () => {
   const [topUsers, setTopUsers] = useState([]);
   const [recentSessions, setRecentSessions] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  useSessionUpdates((event) => {
-    if (event.type === 'updated') {
-      setStats(prev => ({
-        ...prev,
-        activeSessions: Math.max(0, prev.activeSessions - 1),
-      }));
-    }
-  });
-
-  useBandwidthUpdates((event) => {
-    if (event.data) {
-      setStats(prev => ({
-        ...prev,
-        downloadMbps: event.data.downloadMbps || prev.downloadMbps,
-        uploadMbps: event.data.uploadMbps || prev.uploadMbps,
-        totalGbUsed: event.data.totalGb || prev.totalGbUsed,
-        activeSessions: event.data.activeUsers || prev.activeSessions,
-      }));
-    }
-  });
 
   useEffect(() => {
     fetchDashboardData();

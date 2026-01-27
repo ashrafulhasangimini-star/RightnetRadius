@@ -89,6 +89,23 @@ Route::middleware('api')->group(function () {
     Route::get('users/{username}/sessions', [\App\Http\Controllers\Api\SessionController::class, 'getUserSessions']);
     Route::post('users/{username}/disconnect-all', [\App\Http\Controllers\Api\SessionController::class, 'disconnectAll']);
 
+    // ===== NEW: COA (Change of Authorization) Routes =====
+    Route::prefix('coa')->group(function () {
+        Route::post('change-speed', [\App\Http\Controllers\Api\CoaController::class, 'changeSpeed']);
+        Route::post('disconnect', [\App\Http\Controllers\Api\CoaController::class, 'disconnect']);
+        Route::post('update-quota', [\App\Http\Controllers\Api\CoaController::class, 'updateQuota']);
+        Route::post('apply-fup', [\App\Http\Controllers\Api\CoaController::class, 'applyFup']);
+    });
+
+    // ===== NEW: FUP (Fair Usage Policy) Routes =====
+    Route::prefix('fup')->group(function () {
+        Route::get('usage/{userId}', [\App\Http\Controllers\Api\FupController::class, 'getUserUsage']);
+        Route::post('check/{userId}', [\App\Http\Controllers\Api\FupController::class, 'checkFup']);
+        Route::post('check-all', [\App\Http\Controllers\Api\FupController::class, 'checkAllUsers']);
+        Route::post('reset-monthly', [\App\Http\Controllers\Api\FupController::class, 'resetMonthly']);
+        Route::get('dashboard', [\App\Http\Controllers\Api\FupController::class, 'dashboard']);
+    });
+
     // FreeRADIUS Integration Routes
     Route::prefix('freeradius')->group(function () {
         // Configuration Management

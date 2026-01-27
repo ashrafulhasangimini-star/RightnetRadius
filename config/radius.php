@@ -3,49 +3,69 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | FreeRADIUS Server Configuration
+    | RADIUS Server Configuration
     |--------------------------------------------------------------------------
     */
-
-    'enabled' => env('RADIUS_ENABLED', true),
-    'server' => env('RADIUS_SERVER', '127.0.0.1'),
-    'auth_port' => env('RADIUS_AUTH_PORT', 1812),
-    'acct_port' => env('RADIUS_ACCT_PORT', 1813),
-    'secret' => env('RADIUS_SECRET', 'testing123'),
-    'timeout' => env('RADIUS_TIMEOUT', 3),
-    'retries' => env('RADIUS_RETRIES', 3),
+    'server' => [
+        'host' => env('RADIUS_SERVER_HOST', 'localhost'),
+        'auth_port' => env('RADIUS_AUTH_PORT', 1812),
+        'acct_port' => env('RADIUS_ACCT_PORT', 1813),
+        'secret' => env('RADIUS_SECRET', 'secret123'),
+        'timeout' => env('RADIUS_TIMEOUT', 5),
+    ],
 
     /*
     |--------------------------------------------------------------------------
-    | NAS Configuration
+    | Default NAS Configuration
     |--------------------------------------------------------------------------
     */
+    'default_nas_ip' => env('RADIUS_DEFAULT_NAS_IP', '192.168.1.1'),
+    'default_nas_port' => env('RADIUS_DEFAULT_NAS_PORT', 3799), // COA port
 
-    'nas_ip' => env('NAS_IP', '192.168.1.1'),
-    'nas_identifier' => env('NAS_IDENTIFIER', 'RightnetRadius'),
-    'nas_port' => env('NAS_PORT', 1812),
+    /*
+    |--------------------------------------------------------------------------
+    | COA (Change of Authorization) Configuration
+    |--------------------------------------------------------------------------
+    */
+    'coa' => [
+        'enabled' => env('COA_ENABLED', true),
+        'port' => env('COA_PORT', 3799),
+        'timeout' => env('COA_TIMEOUT', 5),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | FUP (Fair Usage Policy) Configuration
+    |--------------------------------------------------------------------------
+    */
+    'fup' => [
+        'enabled' => env('FUP_ENABLED', true),
+        'check_interval' => env('FUP_CHECK_INTERVAL', 60), // minutes
+        'default_speed' => env('FUP_DEFAULT_SPEED', '1M/1M'),
+        'grace_period' => env('FUP_GRACE_PERIOD', 3), // days
+        'notification_threshold' => env('FUP_NOTIFICATION_THRESHOLD', 80), // percentage
+    ],
 
     /*
     |--------------------------------------------------------------------------
     | Session Configuration
     |--------------------------------------------------------------------------
     */
-
-    'session_timeout' => env('SESSION_TIMEOUT', 86400),
-    'idle_timeout' => env('IDLE_TIMEOUT', 600),
-    'interim_accounting_interval' => env('INTERIM_ACCOUNTING_INTERVAL', 600),
+    'session' => [
+        'timeout' => env('RADIUS_SESSION_TIMEOUT', 86400), // 24 hours
+        'interim_interval' => env('RADIUS_INTERIM_INTERVAL', 300), // 5 minutes
+        'max_concurrent' => env('RADIUS_MAX_CONCURRENT_SESSIONS', 1),
+    ],
 
     /*
     |--------------------------------------------------------------------------
-    | IP Pool Configuration
+    | Accounting Configuration
     |--------------------------------------------------------------------------
     */
-
-    'ip_pool' => [
-        'enabled' => env('IP_POOL_ENABLED', true),
-        'range_start' => env('IP_POOL_START', '192.168.100.2'),
-        'range_end' => env('IP_POOL_END', '192.168.100.254'),
-        'subnet_mask' => env('IP_POOL_MASK', '255.255.255.0'),
+    'accounting' => [
+        'enabled' => env('RADIUS_ACCOUNTING_ENABLED', true),
+        'archive_after_days' => env('RADIUS_ARCHIVE_AFTER_DAYS', 90),
+        'delete_after_days' => env('RADIUS_DELETE_AFTER_DAYS', 365),
     ],
 
     /*
@@ -53,63 +73,26 @@ return [
     | Database Configuration
     |--------------------------------------------------------------------------
     */
-
-    'connection' => env('RADIUS_DB_CONNECTION', 'sqlite'),
-    'use_database_users' => env('RADIUS_USE_DB_USERS', true),
-    'user_table' => 'users',
-    'sessions_table' => 'sessions',
-
-    'tables' => [
-        'radcheck' => 'radcheck',
-        'radreply' => 'radreply',
-        'radusergroup' => 'radusergroup',
-        'radacct' => 'radacct',
-        'radpostauth' => 'radpostauth',
-        'radgroupcheck' => 'radgroupcheck',
-        'radgroupreply' => 'radgroupreply',
+    'database' => [
+        'connection' => env('RADIUS_DB_CONNECTION', 'mysql'),
+        'host' => env('RADIUS_DB_HOST', env('DB_HOST', '127.0.0.1')),
+        'port' => env('RADIUS_DB_PORT', env('DB_PORT', '3306')),
+        'database' => env('RADIUS_DB_DATABASE', env('DB_DATABASE', 'radius')),
+        'username' => env('RADIUS_DB_USERNAME', env('DB_USERNAME', 'root')),
+        'password' => env('RADIUS_DB_PASSWORD', env('DB_PASSWORD', '')),
     ],
-
-    'password_hash' => env('RADIUS_PASSWORD_HASH', 'bcrypt'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Accounting Configuration
-    |--------------------------------------------------------------------------
-    */
-
-    'accounting_enabled' => env('ACCOUNTING_ENABLED', true),
-    'interim_updates' => env('INTERIM_UPDATES', true),
-    'detailed_accounting' => env('DETAILED_ACCOUNTING', true),
 
     /*
     |--------------------------------------------------------------------------
     | MikroTik Integration
     |--------------------------------------------------------------------------
     */
-
-    'mikrotik_enabled' => env('MIKROTIK_ENABLED', false),
-    'mikrotik_host' => env('MIKROTIK_HOST', '192.168.1.254'),
-    'mikrotik_port' => env('MIKROTIK_PORT', 8728),
-    'mikrotik_user' => env('MIKROTIK_USER', 'admin'),
-    'mikrotik_password' => env('MIKROTIK_PASSWORD', 'password'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Logging & Monitoring
-    |--------------------------------------------------------------------------
-    */
-
-    'log_authentication' => env('RADIUS_LOG_AUTH', true),
-    'log_accounting' => env('RADIUS_LOG_ACCT', true),
-    'log_level' => env('RADIUS_LOG_LEVEL', 'info'),
-
-    'attributes' => [
-        'User-Name' => 'User-Name',
-        'User-Password' => 'User-Password',
-        'Reply-Message' => 'Reply-Message',
-        'Framed-IP-Address' => 'Framed-IP-Address',
-        'Framed-IP-Netmask' => 'Framed-IP-Netmask',
-        'Session-Timeout' => 'Session-Timeout',
-        'Acct-Interim-Interval' => 'Acct-Interim-Interval',
+    'mikrotik' => [
+        'enabled' => env('MIKROTIK_ENABLED', true),
+        'api_host' => env('MIKROTIK_API_HOST', '192.168.1.1'),
+        'api_port' => env('MIKROTIK_API_PORT', 8728),
+        'api_user' => env('MIKROTIK_API_USER', 'admin'),
+        'api_password' => env('MIKROTIK_API_PASSWORD', ''),
+        'api_ssl' => env('MIKROTIK_API_SSL', false),
     ],
 ];
