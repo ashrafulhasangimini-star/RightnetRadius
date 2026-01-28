@@ -1,159 +1,258 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Models\User;
-use App\Models\Package;
-use App\Models\AuthUser;
-use App\Http\Controllers\RadiusController;
-use App\Http\Controllers\SessionController;
-use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CoaController;
+use App\Http\Controllers\Api\FupController;
+use App\Http\Controllers\Api\PaymentController;
 
-// CORS Header
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
 
-// Test routes
+// Health check
 Route::get('/', function () {
-    return ['message' => 'Welcome to RightnetRadius API'];
+    return response()->json([
+        'message' => 'Welcome to RightnetRadius API',
+        'version' => '2.0',
+        'status' => 'operational'
+    ]);
 });
 
 Route::get('health', function () {
-    return ['status' => 'ok', 'timestamp' => now()];
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => now()->toIso8601String(),
+        'database' => 'connected'
+    ]);
 });
 
-Route::get('users', function () {
-    return [
-        ['id' => 1, 'name' => 'Rajib Khan', 'email' => 'rajib@example.com', 'status' => 'active'],
-        ['id' => 2, 'name' => 'Karim Ahmed', 'email' => 'karim@example.com', 'status' => 'active'],
-        ['id' => 3, 'name' => 'Fatima Islam', 'email' => 'fatima@example.com', 'status' => 'inactive'],
-    ];
+// Public routes (no authentication required)
+Route::prefix('auth')->group(function () {
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('register', [AuthController::class, 'register']);
 });
 
-Route::get('packages', function () {
-    return [
-        ['id' => 1, 'name' => 'Basic Plan', 'speed' => 5, 'price' => 500],
-        ['id' => 2, 'name' => 'Standard Plan', 'speed' => 10, 'price' => 1000],
-        ['id' => 3, 'name' => 'Premium Plan', 'speed' => 20, 'price' => 1500],
-        ['id' => 4, 'name' => 'Enterprise Plan', 'speed' => 50, 'price' => 3000],
-    ];
+// Test data routes
+Route::get('test/users', function () {
+    return response()->json([
+        'success' => true,
+        'data' => [
+            ['id' => 1, 'name' => 'Rajib Khan', 'username' => 'rajib', 'email' => 'rajib@example.com', 'status' => 'active'],
+            ['id' => 2, 'name' => 'Karim Ahmed', 'username' => 'karim', 'email' => 'karim@example.com', 'status' => 'active'],
+            ['id' => 3, 'name' => 'Fatima Islam', 'username' => 'fatima', 'email' => 'fatima@example.com', 'status' => 'inactive'],
+        ]
+    ]);
 });
 
-Route::get('admin-users', function () {
-    try {
-        return AuthUser::all();
-    } catch (\Exception $e) {
-        return ['error' => $e->getMessage()];
-    }
+Route::get('test/packages', function () {
+    return response()->json([
+        'success' => true,
+        'data' => [
+            ['id' => 1, 'name' => 'Basic Plan', 'speed' => '5M/5M', 'price' => 500],
+            ['id' => 2, 'name' => 'Standard Plan', 'speed' => '10M/10M', 'price' => 1000],
+            ['id' => 3, 'name' => 'Premium Plan', 'speed' => '20M/20M', 'price' => 1500],
+            ['id' => 4, 'name' => 'Enterprise Plan', 'speed' => '50M/50M', 'price' => 3000],
+        ]
+    ]);
 });
 
-Route::middleware('api')->group(function () {
-    // Authentication
-    Route::post('auth/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
-    Route::post('auth/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout']);
+// Protected routes (require authentication)
+Route::middleware(['auth:sanctum'])->group(function () {
     
-    // RADIUS Authentication & Sessions
-    Route::post('radius/authenticate', [\App\Http\Controllers\Api\RadiusAuthController::class, 'authenticate']);
-    Route::post('accounting/start', [\App\Http\Controllers\Api\RadiusAuthController::class, 'accountingStart']);
-    Route::post('accounting/interim', [\App\Http\Controllers\Api\RadiusAuthController::class, 'accountingInterim']);
-    Route::post('accounting/stop', [\App\Http\Controllers\Api\RadiusAuthController::class, 'accountingStop']);
-    Route::get('bandwidth/quota/{username}', [\App\Http\Controllers\Api\RadiusAuthController::class, 'checkQuota']);
-    
-    // Bandwidth Management
-    Route::get('bandwidth/usage', [\App\Http\Controllers\Api\BandwidthController::class, 'getUsage']);
-    Route::get('bandwidth/history', [\App\Http\Controllers\Api\BandwidthController::class, 'getHistory']);
-    Route::get('bandwidth/top-users', [\App\Http\Controllers\Api\BandwidthController::class, 'getTopUsers']);
-    Route::post('bandwidth/limit', [\App\Http\Controllers\Api\BandwidthController::class, 'setLimit']);
-    Route::post('bandwidth/block', [\App\Http\Controllers\Api\BandwidthController::class, 'blockUser']);
-    Route::post('bandwidth/unblock', [\App\Http\Controllers\Api\BandwidthController::class, 'unblockUser']);
-    Route::post('bandwidth/disconnect', [\App\Http\Controllers\Api\BandwidthController::class, 'disconnect']);
-    
-    // Audit Logs
-    Route::get('audit/logs', [\App\Http\Controllers\Api\AuditLogController::class, 'index']);
-    Route::get('audit/logs/filter', [\App\Http\Controllers\Api\AuditLogController::class, 'filter']);
-    Route::get('audit/logs/export', [\App\Http\Controllers\Api\AuditLogController::class, 'export']);
-    
-    // Customer Dashboard
-    Route::get('customer/dashboard', [\App\Http\Controllers\Api\CustomerController::class, 'dashboard']);
-    Route::get('customer/profile', [\App\Http\Controllers\Api\CustomerController::class, 'profile']);
-    Route::post('customer/profile/update', [\App\Http\Controllers\Api\CustomerController::class, 'updateProfile']);
-    
-    // Admin Configuration
-    Route::post('admin/config', [\App\Http\Controllers\Api\AdminController::class, 'saveConfig']);
-    Route::get('admin/config', [\App\Http\Controllers\Api\AdminController::class, 'getConfig']);
-    Route::get('admin/status', [\App\Http\Controllers\Api\AdminController::class, 'systemStatus']);
-    
-    // Session Management
-    Route::get('sessions', [\App\Http\Controllers\Api\SessionController::class, 'getActiveSessions']);
-    Route::get('sessions/stats', [\App\Http\Controllers\Api\SessionController::class, 'getStats']);
-    Route::get('users/{username}/sessions', [\App\Http\Controllers\Api\SessionController::class, 'getUserSessions']);
-    Route::post('users/{username}/disconnect-all', [\App\Http\Controllers\Api\SessionController::class, 'disconnectAll']);
+    // Auth routes
+    Route::prefix('auth')->group(function () {
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::get('user', [AuthController::class, 'user']);
+        Route::post('refresh', [AuthController::class, 'refresh']);
+    });
 
-    // ===== NEW: COA (Change of Authorization) Routes =====
+    // COA (Change of Authorization) routes
     Route::prefix('coa')->group(function () {
-        Route::post('change-speed', [\App\Http\Controllers\Api\CoaController::class, 'changeSpeed']);
-        Route::post('disconnect', [\App\Http\Controllers\Api\CoaController::class, 'disconnect']);
-        Route::post('update-quota', [\App\Http\Controllers\Api\CoaController::class, 'updateQuota']);
-        Route::post('apply-fup', [\App\Http\Controllers\Api\CoaController::class, 'applyFup']);
+        Route::post('change-speed', [CoaController::class, 'changeSpeed']);
+        Route::post('disconnect', [CoaController::class, 'disconnect']);
+        Route::post('update-quota', [CoaController::class, 'updateQuota']);
+        Route::post('apply-fup', [CoaController::class, 'applyFup']);
     });
 
-    // ===== NEW: FUP (Fair Usage Policy) Routes =====
+    // FUP (Fair Usage Policy) routes
     Route::prefix('fup')->group(function () {
-        Route::get('usage/{userId}', [\App\Http\Controllers\Api\FupController::class, 'getUserUsage']);
-        Route::post('check/{userId}', [\App\Http\Controllers\Api\FupController::class, 'checkFup']);
-        Route::post('check-all', [\App\Http\Controllers\Api\FupController::class, 'checkAllUsers']);
-        Route::post('reset-monthly', [\App\Http\Controllers\Api\FupController::class, 'resetMonthly']);
-        Route::get('dashboard', [\App\Http\Controllers\Api\FupController::class, 'dashboard']);
+        Route::get('usage/{userId}', [FupController::class, 'getUserUsage']);
+        Route::post('check/{userId}', [FupController::class, 'checkFup']);
+        Route::post('check-all', [FupController::class, 'checkAllUsers']);
+        Route::post('reset-monthly', [FupController::class, 'resetMonthly']);
+        Route::get('dashboard', [FupController::class, 'dashboard']);
     });
 
-    // FreeRADIUS Integration Routes
-    Route::prefix('freeradius')->group(function () {
-        // Configuration Management
-        Route::get('config', [\App\Http\Controllers\FreeRadiusController::class, 'getConfig']);
-        Route::put('config', [\App\Http\Controllers\FreeRadiusController::class, 'updateConfig']);
-        
-        // Server Status & Health Check
-        Route::get('status', [\App\Http\Controllers\FreeRadiusController::class, 'checkStatus']);
-        Route::get('diagnostics', [\App\Http\Controllers\FreeRadiusController::class, 'getDiagnostics']);
-        
-        // NAS Clients Management (RouterOS, WiFi Access Points, etc.)
-        Route::get('nas-clients', [\App\Http\Controllers\FreeRadiusController::class, 'getNasClients']);
-        Route::post('nas-clients', [\App\Http\Controllers\FreeRadiusController::class, 'addNasClient']);
-        Route::put('nas-clients/{id}', [\App\Http\Controllers\FreeRadiusController::class, 'updateNasClient']);
-        Route::delete('nas-clients/{id}', [\App\Http\Controllers\FreeRadiusController::class, 'deleteNasClient']);
-        
-        // RADIUS Users Management
-        Route::get('users', [\App\Http\Controllers\FreeRadiusController::class, 'getRadiusUsers']);
-        
-        // Export Functions (for FreeRADIUS server configuration)
-        Route::get('export/users', [\App\Http\Controllers\FreeRadiusController::class, 'exportRadiusUsers']);
-        Route::get('export/clients', [\App\Http\Controllers\FreeRadiusController::class, 'exportNasClients']);
-        
-        // Authentication Testing
-        Route::post('test-auth', [\App\Http\Controllers\FreeRadiusController::class, 'testAuthentication']);
-        
-        // Accounting Logs
-        Route::get('accounting-logs', [\App\Http\Controllers\FreeRadiusController::class, 'getAccountingLogs']);
+    // Payment routes
+    Route::prefix('payments')->group(function () {
+        Route::post('create', [PaymentController::class, 'createPayment']);
+        Route::get('status/{transactionId}', [PaymentController::class, 'getPaymentStatus']);
+        Route::get('history/{userId}', [PaymentController::class, 'getPaymentHistory']);
     });
 
-    // Protected routes
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::post('logout', function() { return ['message' => 'Logged out']; });
+    // Notification routes
+    Route::prefix('notifications')->group(function () {
+        Route::get('{userId}', function($userId) {
+            $notifications = \DB::table('notifications')
+                ->where('user_id', $userId)
+                ->orderBy('created_at', 'desc')
+                ->limit(50)
+                ->get();
 
-        // Users
-        Route::get('user-list', function() { return ['users' => []]; });
+            return response()->json([
+                'success' => true,
+                'data' => $notifications
+            ]);
+        });
 
-        // Usage
-        Route::get('usage', function() { return ['usage' => []]; });
-        Route::get('usage/summary', function() { return ['summary' => []]; });
+        Route::post('{notificationId}/read', function($notificationId) {
+            \DB::table('notifications')
+                ->where('id', $notificationId)
+                ->update(['read' => true, 'read_at' => now()]);
 
-        // Invoices
-        Route::get('invoices', function() { return ['invoices' => []]; });
+            return response()->json([
+                'success' => true,
+                'message' => 'Notification marked as read'
+            ]);
+        });
 
-        // Transactions
-        Route::get('transactions', function() { return ['transactions' => []]; });
+        Route::post('{userId}/read-all', function($userId) {
+            $count = \DB::table('notifications')
+                ->where('user_id', $userId)
+                ->where('read', false)
+                ->update(['read' => true, 'read_at' => now()]);
 
-        // Packages
-        Route::get('package-list', function() { return ['packages' => []]; });
+            return response()->json([
+                'success' => true,
+                'message' => 'All notifications marked as read',
+                'count' => $count
+            ]);
+        });
     });
+
+    // User routes
+    Route::prefix('users')->group(function () {
+        Route::get('list', function() {
+            try {
+                $users = \App\Models\User::with('package')
+                    ->select('id', 'username', 'email', 'phone', 'status', 'package_id')
+                    ->limit(100)
+                    ->get();
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $users
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+        });
+
+        Route::get('{id}', function($id) {
+            try {
+                $user = \App\Models\User::with('package')->findOrFail($id);
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $user
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+        });
+    });
+
+    // Package routes
+    Route::prefix('packages')->group(function () {
+        Route::get('list', function() {
+            try {
+                $packages = \DB::table('packages')
+                    ->select('id', 'name', 'speed', 'price', 'quota_gb', 'fup_speed', 'fup_enabled')
+                    ->where('status', 'active')
+                    ->get();
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $packages
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+        });
+    });
+
+    // Invoice routes
+    Route::prefix('invoices')->group(function () {
+        Route::get('list', function() {
+            return response()->json([
+                'success' => true,
+                'data' => []
+            ]);
+        });
+
+        Route::get('{id}', function($id) {
+            return response()->json([
+                'success' => true,
+                'data' => []
+            ]);
+        });
+    });
+
+    // Transaction routes
+    Route::prefix('transactions')->group(function () {
+        Route::get('list', function() {
+            return response()->json([
+                'success' => true,
+                'data' => []
+            ]);
+        });
+    });
+
+    // Dashboard stats
+    Route::get('dashboard/stats', function() {
+        try {
+            $stats = [
+                'total_users' => \DB::table('users')->count(),
+                'active_users' => \DB::table('users')->where('status', 'active')->count(),
+                'total_packages' => \DB::table('packages')->count(),
+                'fup_applied' => \DB::table('fup_usage')->where('fup_applied', true)->count(),
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => $stats
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    });
+});
+
+// Payment callback routes (public - called by payment gateways)
+Route::prefix('callbacks')->group(function () {
+    Route::any('bkash', [PaymentController::class, 'bkashCallback'])->name('payment.bkash.callback');
+    Route::any('nagad', [PaymentController::class, 'nagadCallback'])->name('payment.nagad.callback');
+});
+
+// Catch-all for undefined routes
+Route::fallback(function(){
+    return response()->json([
+        'success' => false,
+        'message' => 'Endpoint not found'
+    ], 404);
 });
