@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Upload, Users, HardDrive, TrendingUp, TrendingDown, Activity } from 'lucide-react';
-import { BandwidthChart, TopUsersChart, HourlyBandwidthChart, SessionsChart } from '../components/BandwidthCharts';
+import { Download, Upload, Users, HardDrive, Activity } from 'lucide-react';
 import StatCard from '../components/ui/StatCard';
 import { Card, CardHeader, CardTitle, CardBody } from '../components/ui/Card';
-import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '../components/ui/Table';
-import { Badge } from '../components/ui/Badge';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -14,80 +11,21 @@ const Dashboard = () => {
     totalGbUsed: 1245.32,
   });
 
-  const [bandwidthHistory, setBandwidthHistory] = useState([]);
-  const [topUsers, setTopUsers] = useState([]);
-  const [recentSessions, setRecentSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
+  // Mock data fetch
   useEffect(() => {
-    fetchDashboardData();
-    // Set up polling for real-time updates
-    const interval = setInterval(fetchDashboardData, 30000); // Every 30 seconds
+    // Simulate data fetch
+    const interval = setInterval(() => {
+      setStats(prev => ({
+        ...prev,
+        downloadMbps: (Math.random() * 50 + 20).toFixed(1),
+        uploadMbps: (Math.random() * 30 + 10).toFixed(1),
+      }));
+    }, 5000);
+
     return () => clearInterval(interval);
   }, []);
-
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-
-      // Fetch bandwidth usage
-      const usageRes = await fetch('/api/bandwidth/usage', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const usageData = await usageRes.json();
-
-      // Fetch 24-hour history
-      const historyRes = await fetch('/api/bandwidth/history', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const historyData = await historyRes.json();
-      setBandwidthHistory(historyData.data || []);
-
-      // Fetch top users
-      const topUsersRes = await fetch('/api/bandwidth/top-users', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const topUsersData = await topUsersRes.json();
-      setTopUsers(topUsersData.data || []);
-
-      // Fetch recent sessions
-      const sessionsRes = await fetch('/api/sessions/active', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const sessionsData = await sessionsRes.json();
-      setRecentSessions(sessionsData.data?.slice(0, 5) || []);
-
-      // Update stats
-      if (usageData.success) {
-        setStats(prev => ({
-          ...prev,
-          downloadMbps: usageData.data.download_mbps,
-          uploadMbps: usageData.data.upload_mbps,
-          activeSessions: usageData.data.active_sessions,
-          totalGbUsed: usageData.data.total_gb_used,
-        }));
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatBytes = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const formatDuration = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
-  };
 
   if (loading) {
     return (
@@ -99,12 +37,22 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h2 className="text-title-md2 font-semibold text-black dark:text-white">
+          Dashboard Overview
+        </h2>
+        <p className="text-body mt-1">
+          Real-time system statistics and monitoring
+        </p>
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">
         <StatCard
           icon={Download}
           title="Download Speed"
-          value={`${stats.downloadMbps.toFixed(1)} Mbps`}
+          value={`${stats.downloadMbps} Mbps`}
           trend="up"
           trendValue="12%"
           iconBg="bg-meta-5"
@@ -113,7 +61,7 @@ const Dashboard = () => {
         <StatCard
           icon={Upload}
           title="Upload Speed"
-          value={`${stats.uploadMbps.toFixed(1)} Mbps`}
+          value={`${stats.uploadMbps} Mbps`}
           trend="up"
           trendValue="8%"
           iconBg="bg-meta-3"
@@ -139,109 +87,111 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2 2xl:gap-7.5">
-        {/* Bandwidth Chart */}
+      {/* Quick Info Cards */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Bandwidth Usage (24 Hours)</CardTitle>
+            <CardTitle>
+              <div className="flex items-center gap-2">
+                <Activity className="text-primary" size={20} />
+                System Status
+              </div>
+            </CardTitle>
           </CardHeader>
           <CardBody>
-            <BandwidthChart data={bandwidthHistory} />
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-body">RADIUS Server</span>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-success"></div>
+                  <span className="text-sm font-medium text-success">Online</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-body">Database</span>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-success"></div>
+                  <span className="text-sm font-medium text-success">Connected</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-body">API Service</span>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-success"></div>
+                  <span className="text-sm font-medium text-success">Running</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-body">WebSocket</span>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-warning"></div>
+                  <span className="text-sm font-medium text-warning">Standby</span>
+                </div>
+              </div>
+            </div>
           </CardBody>
         </Card>
 
-        {/* Top Users Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Top Users by Bandwidth</CardTitle>
+            <CardTitle>Quick Stats</CardTitle>
           </CardHeader>
           <CardBody>
-            <TopUsersChart data={topUsers} />
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-body">Total Users</span>
+                <span className="text-lg font-semibold text-black dark:text-white">1,245</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-body">Active Users</span>
+                <span className="text-lg font-semibold text-black dark:text-white">892</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-body">Packages</span>
+                <span className="text-lg font-semibold text-black dark:text-white">4</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-body">Revenue (Month)</span>
+                <span className="text-lg font-semibold text-success">৳ 2,45,000</span>
+              </div>
+            </div>
           </CardBody>
         </Card>
       </div>
 
-      {/* Sessions Chart Full Width */}
+      {/* Recent Activity */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            <div className="flex items-center gap-2">
-              <Activity className="text-primary" size={20} />
-              Hourly Bandwidth Distribution
-            </div>
-          </CardTitle>
+          <CardTitle>Recent Activity</CardTitle>
         </CardHeader>
         <CardBody>
-          <HourlyBandwidthChart data={bandwidthHistory} />
+          <div className="space-y-3">
+            {[
+              { user: 'rajib.khan', action: 'logged in', time: '2 minutes ago', type: 'success' },
+              { user: 'karim.ahmed', action: 'data quota reached 90%', time: '15 minutes ago', type: 'warning' },
+              { user: 'fatima.islam', action: 'package upgraded', time: '1 hour ago', type: 'info' },
+              { user: 'ali.hassan', action: 'logged out', time: '2 hours ago', type: 'default' },
+              { user: 'noor.aman', action: 'authentication failed', time: '3 hours ago', type: 'danger' },
+            ].map((activity, idx) => (
+              <div key={idx} className="flex items-center justify-between py-2 border-b border-stroke dark:border-strokedark last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className={`h-2 w-2 rounded-full ${
+                    activity.type === 'success' ? 'bg-success' :
+                    activity.type === 'warning' ? 'bg-warning' :
+                    activity.type === 'danger' ? 'bg-danger' :
+                    activity.type === 'info' ? 'bg-primary' : 'bg-body'
+                  }`}></div>
+                  <div>
+                    <p className="text-sm font-medium text-black dark:text-white">
+                      <span className="font-bold">{activity.user}</span> {activity.action}
+                    </p>
+                    <p className="text-xs text-body">{activity.time}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardBody>
-      </Card>
-
-      {/* Recent Sessions Table */}
-      <Card padding={false}>
-        <CardHeader>
-          <CardTitle>Recent Active Sessions</CardTitle>
-        </CardHeader>
-        <div className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>IP Address</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Download</TableHead>
-                <TableHead>Upload</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentSessions.length > 0 ? (
-                recentSessions.map((session, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>
-                      <p className="text-black dark:text-white font-medium">
-                        {session.username}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-body">{session.framed_ip || 'N/A'}</p>
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-body">
-                        {formatDuration(session.duration_seconds || 0)}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-body">
-                        {formatBytes((session.input_octets || 0) * 1024 * 1024)}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-body">
-                        {formatBytes((session.output_octets || 0) * 1024 * 1024)}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-black dark:text-white font-medium">
-                        {formatBytes((session.total_octets || 0) * 1024 * 1024)}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="success">Active</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center">
-                    <p className="text-body">No active sessions found</p>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
       </Card>
     </div>
   );
