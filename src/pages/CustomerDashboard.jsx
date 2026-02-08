@@ -115,7 +115,7 @@ export default function CustomerDashboard({ admin, onLogout }) {
   }
 
   return (
-    <div className="dark:bg-boxdark-2 dark:text-bodydark">
+    <div className="flex h-screen overflow-hidden bg-whiten dark:bg-boxdark-2">
       {/* Mobile Sidebar Backdrop */}
       {sidebarOpen && (
         <div 
@@ -126,7 +126,7 @@ export default function CustomerDashboard({ admin, onLogout }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-9999 flex h-screen w-72.5 flex-col overflow-y-hidden bg-black duration-300 ease-linear dark:bg-boxdark lg:static lg:translate-x-0 ${
+        className={`absolute left-0 top-0 z-9999 flex h-screen w-72.5 flex-col overflow-y-hidden bg-black duration-300 ease-linear dark:bg-boxdark lg:static lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -187,7 +187,7 @@ export default function CustomerDashboard({ admin, onLogout }) {
       </aside>
 
       {/* Main Content */}
-      <div className="relative flex flex-1 flex-col lg:ml-72.5">
+      <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
         <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
           <div className="flex flex-grow items-center justify-between py-4 px-4 shadow-2 md:px-6 2xl:px-11">
             <div className="flex items-center gap-2 sm:gap-4">
@@ -200,7 +200,7 @@ export default function CustomerDashboard({ admin, onLogout }) {
           </div>
         </header>
 
-        <main className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 w-full">
+        <main className="mx-auto w-full max-w-screen-2xl p-4 md:p-6 2xl:p-10">
           <div className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">

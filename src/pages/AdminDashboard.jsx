@@ -22,8 +22,6 @@ export default function AdminDashboard({ admin, onLogout }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const renderContent = () => {
-    console.log('Rendering content for tab:', activeTab);
-    
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
@@ -51,18 +49,10 @@ export default function AdminDashboard({ admin, onLogout }) {
   ];
 
   return (
-    <div className="dark:bg-boxdark-2 dark:text-bodydark">
-      {/* Mobile Sidebar Backdrop */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 z-9998 bg-black bg-opacity-50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
+    <div className="flex h-screen overflow-hidden bg-whiten dark:bg-boxdark-2">
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-9999 flex h-screen w-72.5 flex-col overflow-y-hidden bg-black duration-300 ease-linear dark:bg-boxdark lg:static lg:translate-x-0 ${
+        className={`absolute left-0 top-0 z-9999 flex h-screen w-72.5 flex-col overflow-y-hidden bg-black duration-300 ease-linear dark:bg-boxdark lg:static lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -94,9 +84,7 @@ export default function AdminDashboard({ admin, onLogout }) {
                     <li key={item.id}>
                       <button
                         onClick={() => {
-                          console.log('Menu clicked:', item.id);
                           setActiveTab(item.id);
-                          // Close sidebar on mobile after click
                           if (window.innerWidth < 1024) {
                             setSidebarOpen(false);
                           }
@@ -140,10 +128,7 @@ export default function AdminDashboard({ admin, onLogout }) {
             {userMenuOpen && (
               <div className="absolute bottom-full left-0 right-0 mb-2 rounded-sm border border-strokedark bg-boxdark shadow-default">
                 <button
-                  onClick={() => {
-                    console.log('Logout clicked');
-                    onLogout();
-                  }}
+                  onClick={onLogout}
                   className="flex w-full items-center gap-3 px-4 py-3 text-sm text-bodydark1 hover:bg-graydark"
                 >
                   <LogOut size={18} />
@@ -156,7 +141,7 @@ export default function AdminDashboard({ admin, onLogout }) {
       </aside>
 
       {/* Main Content Area */}
-      <div className="relative flex flex-1 flex-col lg:ml-72.5">
+      <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
         {/* Header */}
         <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
           <div className="flex flex-grow items-center justify-between py-4 px-4 shadow-2 md:px-6 2xl:px-11">
@@ -185,7 +170,7 @@ export default function AdminDashboard({ admin, onLogout }) {
         </header>
 
         {/* Main Content */}
-        <main className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 w-full">
+        <main className="mx-auto w-full max-w-screen-2xl p-4 md:p-6 2xl:p-10">
           {renderContent()}
         </main>
       </div>
