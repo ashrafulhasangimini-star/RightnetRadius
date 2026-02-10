@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CoaController;
 use App\Http\Controllers\Api\FupController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\ReportsController;
+use App\Http\Controllers\Api\DashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -220,26 +222,38 @@ Route::middleware(['auth:sanctum'])->group(function () {
         });
     });
 
-    // Dashboard stats
-    Route::get('dashboard/stats', function() {
-        try {
-            $stats = [
-                'total_users' => \DB::table('users')->count(),
-                'active_users' => \DB::table('users')->where('status', 'active')->count(),
-                'total_packages' => \DB::table('packages')->count(),
-                'fup_applied' => \DB::table('fup_usage')->where('fup_applied', true)->count(),
-            ];
+    // Enhanced Dashboard routes
+    Route::prefix('dashboard')->group(function () {
+        // Admin dashboard
+        Route::get('admin/stats', [DashboardController::class, 'adminStats']);
+        Route::get('admin/online-history', [DashboardController::class, 'onlineUsersHistory']);
+        Route::get('admin/revenue-history', [DashboardController::class, 'revenueHistory']);
+        
+        // FUP dashboard
+        Route::get('fup', [DashboardController::class, 'fupDashboard']);
+        
+        // COA dashboard
+        Route::get('coa', [DashboardController::class, 'coaDashboard']);
+        
+        // User specific dashboard
+        Route::get('user/{userId}', [DashboardController::class, 'userDashboard']);
+        Route::get('user/{userId}/bandwidth-history', [DashboardController::class, 'userBandwidthHistory']);
+        Route::get('user/{userId}/usage', [DashboardController::class, 'userUsage']);
+        
+        // Package analytics
+        Route::get('packages/analytics', [DashboardController::class, 'packageAnalytics']);
+        
+        // Legacy stats endpoint (for backward compatibility)
+        Route::get('stats', [DashboardController::class, 'adminStats']);
+    });
 
-            return response()->json([
-                'success' => true,
-                'data' => $stats
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+    // Reports routes
+    Route::prefix('reports')->group(function () {
+        Route::get('subscriber', [ReportsController::class, 'subscriber']);
+        Route::get('accounting', [ReportsController::class, 'accounting']);
+        Route::get('user', [ReportsController::class, 'user']);
+        Route::get('profit', [ReportsController::class, 'profit']);
+        Route::get('usage', [ReportsController::class, 'usage']);
     });
 });
 

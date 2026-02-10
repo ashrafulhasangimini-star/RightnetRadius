@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\Session;
+use App\Models\Package;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -10,277 +12,353 @@ use Carbon\Carbon;
 class FupService
 {
     protected $coaService;
-    
+
     public function __construct(CoaService $coaService)
     {
         $this->coaService = $coaService;
     }
-    
+
     /**
-     * Check and apply FUP for all active users
-     * Run this via scheduled task every hour
+     * Check FUP for a specific user
      */
-    public function checkAndApplyFupForAll(): array
+    public function checkUserFup($userId)
     {
-        $results = [
-            'checked' => 0,
-            'fup_applied' => 0,
-            'fup_removed' => 0,
-            'errors' => 0
-        ];
+        $user = User::with('package')->find($userId);
         
-        // Get all active users with FUP-enabled packages
-        $users = User::with('package')
-            ->whereHas('package', function($q) {
-                $q->where('fup_enabled', true)
-                  ->where('quota_gb', '>', 0);
-            })
-            ->where('status', 'active')
-            ->get();
-            
-        foreach ($users as $user) {
-            try {
-                $results['checked']++;
-                $result = $this->checkAndApplyFup($user);
-                
-                if ($result['fup_applied'] ?? false) {
-                    $results['fup_applied']++;
-                } elseif ($result['fup_removed'] ?? false) {
-                    $results['fup_removed']++;
-                }
-                
-            } catch (\Exception $e) {
-                $results['errors']++;
-                Log::error("FUP check failed for user {$user->username}: " . $e->getMessage());
-            }
+        if (!$user || !$user->package || !$user->package->fup_enabled) {
+            return ['status' => 'not_applicable', 'message' => 'FUP not enabled for this user'];
         }
-        
-        return $results;
-    }
-    
-    /**
-     * Check and apply FUP for a single user
-     */
-    public function checkAndApplyFup(User $user): array
-    {
-        if (!$user->package || !$user->package->fup_enabled) {
-            return ['fup_applied' => false, 'message' => 'FUP not enabled'];
-        }
-        
+
         // Calculate current month usage
-        $usage = $this->calculateMonthlyUsage($user->id);
-        $quotaBytes = $user->package->quota_gb * 1024 * 1024 * 1024;
+        $currentUsage = $this->calculateMonthlyUsage($userId);
+        $quotaBytes = $user->package->quota_gb * 1024 * 1024 * 1024; // Convert GB to bytes
         
-        // Get or create FUP usage record
-        $fupUsage = DB::table('fup_usage')->updateOrInsert(
-            [
-                'user_id' => $user->id,
-                'usage_date' => now()->format('Y-m-d')
-            ],
-            [
-                'total_bytes' => $usage,
-                'quota_bytes' => $quotaBytes,
-                'updated_at' => now()
-            ]
-        );
-        
-        $fupRecord = DB::table('fup_usage')
-            ->where('user_id', $user->id)
-            ->where('usage_date', now()->format('Y-m-d'))
-            ->first();
-        
-        // Check if quota exceeded
-        if ($usage > $quotaBytes) {
-            return $this->applyFup($user, $fupRecord);
-        } else {
-            return $this->removeFup($user, $fupRecord);
+        // Save usage to database
+        $this->saveUsageData($userId, $currentUsage, $quotaBytes);
+
+        // Check if FUP should be applied
+        if ($currentUsage >= $quotaBytes && !$this->isFupAlreadyApplied($userId)) {
+            return $this->applyFup($user, $currentUsage, $quotaBytes);
         }
-    }
-    
-    /**
-     * Apply FUP speed reduction
-     */
-    protected function applyFup(User $user, $fupUsage): array
-    {
-        if ($fupUsage && $fupUsage->fup_applied) {
+
+        // Check if user is in warning zone (80% of quota)
+        $warningThreshold = $quotaBytes * 0.8;
+        if ($currentUsage >= $warningThreshold && $currentUsage < $quotaBytes) {
             return [
-                'fup_applied' => false,
-                'message' => 'FUP already applied',
-                'usage_gb' => round($fupUsage->total_bytes / (1024**3), 2),
-                'quota_gb' => round($fupUsage->quota_bytes / (1024**3), 2)
+                'status' => 'warning',
+                'message' => 'User approaching quota limit',
+                'usage_gb' => round($currentUsage / 1024 / 1024 / 1024, 2),
+                'quota_gb' => $user->package->quota_gb,
+                'percentage_used' => round(($currentUsage / $quotaBytes) * 100, 2)
             ];
         }
-        
-        // Get NAS IP from user's session or config
-        $nasIp = $this->getUserNasIp($user);
-        $secret = config('radius.secret', 'secret123');
-        
-        // Send CoA to change speed
-        $coaResult = $this->coaService->changeSpeed(
-            $user->username,
-            $user->package->fup_speed,
-            $nasIp,
-            $secret
-        );
-        
-        if ($coaResult['success']) {
-            DB::table('fup_usage')
-                ->where('user_id', $user->id)
-                ->where('usage_date', now()->format('Y-m-d'))
-                ->update([
+
+        return [
+            'status' => 'normal',
+            'message' => 'Usage within limits',
+            'usage_gb' => round($currentUsage / 1024 / 1024 / 1024, 2),
+            'quota_gb' => $user->package->quota_gb,
+            'percentage_used' => round(($currentUsage / $quotaBytes) * 100, 2)
+        ];
+    }
+
+    /**
+     * Apply FUP to user
+     */
+    public function applyFup($user, $currentUsage, $quotaBytes)
+    {
+        try {
+            DB::beginTransaction();
+
+            // Update FUP usage record
+            DB::table('fup_usage')->updateOrInsert(
+                [
+                    'user_id' => $user->id,
+                    'usage_date' => now()->format('Y-m-01') // First day of current month
+                ],
+                [
+                    'total_bytes' => $currentUsage,
+                    'quota_bytes' => $quotaBytes,
                     'fup_applied' => true,
                     'fup_applied_at' => now(),
                     'original_speed' => $user->package->speed,
                     'fup_speed' => $user->package->fup_speed,
                     'updated_at' => now()
-                ]);
-            
-            Log::info("FUP applied for user {$user->username}", [
+                ]
+            );
+
+            // Send COA to change speed
+            $coaResult = $this->coaService->changeUserSpeed(
+                $user->username,
+                $user->package->fup_speed,
+                config('radius.default_nas_ip'),
+                config('radius.secret')
+            );
+
+            DB::commit();
+
+            Log::info("FUP applied to user {$user->username}", [
+                'user_id' => $user->id,
+                'usage_gb' => round($currentUsage / 1024 / 1024 / 1024, 2),
+                'quota_gb' => $user->package->quota_gb,
                 'original_speed' => $user->package->speed,
                 'fup_speed' => $user->package->fup_speed,
-                'usage_gb' => round($fupUsage->total_bytes / (1024**3), 2),
-                'quota_gb' => round($fupUsage->quota_bytes / (1024**3), 2)
+                'coa_result' => $coaResult
             ]);
-        }
-        
-        return [
-            'fup_applied' => true,
-            'coa_result' => $coaResult,
-            'usage_gb' => round($fupUsage->total_bytes / (1024**3), 2),
-            'quota_gb' => round($fupUsage->quota_bytes / (1024**3), 2),
-            'new_speed' => $user->package->fup_speed
-        ];
-    }
-    
-    /**
-     * Remove FUP (restore original speed)
-     */
-    protected function removeFup(User $user, $fupUsage): array
-    {
-        if (!$fupUsage || !$fupUsage->fup_applied) {
+
             return [
-                'fup_removed' => false,
-                'message' => 'FUP not applied',
-                'usage_gb' => $fupUsage ? round($fupUsage->total_bytes / (1024**3), 2) : 0,
-                'quota_gb' => $fupUsage ? round($fupUsage->quota_bytes / (1024**3), 2) : 0
+                'status' => 'fup_applied',
+                'message' => 'FUP applied successfully',
+                'usage_gb' => round($currentUsage / 1024 / 1024 / 1024, 2),
+                'quota_gb' => $user->package->quota_gb,
+                'original_speed' => $user->package->speed,
+                'fup_speed' => $user->package->fup_speed,
+                'coa_result' => $coaResult
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to apply FUP to user {$user->username}: " . $e->getMessage());
+            
+            return [
+                'status' => 'error',
+                'message' => 'Failed to apply FUP: ' . $e->getMessage()
             ];
         }
-        
-        // Get NAS IP
-        $nasIp = $this->getUserNasIp($user);
-        $secret = config('radius.secret', 'secret123');
-        
-        // Send CoA to restore original speed
-        $coaResult = $this->coaService->changeSpeed(
-            $user->username,
-            $user->package->speed,
-            $nasIp,
-            $secret
-        );
-        
-        if ($coaResult['success']) {
-            DB::table('fup_usage')
-                ->where('user_id', $user->id)
-                ->where('usage_date', now()->format('Y-m-d'))
-                ->update([
-                    'fup_applied' => false,
-                    'updated_at' => now()
-                ]);
-            
-            Log::info("FUP removed for user {$user->username}", [
-                'restored_speed' => $user->package->speed
-            ]);
-        }
-        
-        return [
-            'fup_removed' => true,
-            'coa_result' => $coaResult,
-            'usage_gb' => round($fupUsage->total_bytes / (1024**3), 2),
-            'quota_gb' => round($fupUsage->quota_bytes / (1024**3), 2),
-            'restored_speed' => $user->package->speed
-        ];
     }
-    
+
     /**
-     * Calculate monthly data usage from RADIUS accounting
+     * Calculate monthly usage for a user
      */
-    protected function calculateMonthlyUsage(int $userId): int
+    public function calculateMonthlyUsage($userId)
     {
-        $user = User::find($userId);
         $startOfMonth = now()->startOfMonth();
-        
-        $usage = DB::table('radacct')
-            ->where('username', $user->username)
-            ->where('acctstarttime', '>=', $startOfMonth)
-            ->sum(DB::raw('acctinputoctets + acctoutputoctets'));
-            
-        return (int) $usage;
+        $endOfMonth = now()->endOfMonth();
+
+        $usage = Session::where('user_id', $userId)
+            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->sum(DB::raw('input_octets + output_octets'));
+
+        return $usage ?: 0;
     }
-    
+
     /**
-     * Get user's NAS IP address
+     * Save usage data to database
      */
-    protected function getUserNasIp(User $user): string
+    public function saveUsageData($userId, $totalBytes, $quotaBytes)
     {
-        // Try to get from active session
-        $session = DB::table('radacct')
-            ->where('username', $user->username)
-            ->whereNull('acctstoptime')
-            ->orderBy('acctstarttime', 'desc')
-            ->first();
-            
-        if ($session) {
-            return $session->nasipaddress;
-        }
-        
-        // Fallback to default NAS
-        return config('radius.default_nas_ip', '192.168.1.1');
+        DB::table('fup_usage')->updateOrInsert(
+            [
+                'user_id' => $userId,
+                'usage_date' => now()->format('Y-m-01') // First day of current month
+            ],
+            [
+                'total_bytes' => $totalBytes,
+                'quota_bytes' => $quotaBytes,
+                'updated_at' => now()
+            ]
+        );
     }
-    
+
     /**
-     * Get usage statistics for user
+     * Check if FUP is already applied for current month
      */
-    public function getUserUsageStats(int $userId): array
+    public function isFupAlreadyApplied($userId)
     {
-        $user = User::find($userId);
+        return DB::table('fup_usage')
+            ->where('user_id', $userId)
+            ->where('usage_date', now()->format('Y-m-01'))
+            ->where('fup_applied', true)
+            ->exists();
+    }
+
+    /**
+     * Get user usage details
+     */
+    public function getUserUsage($userId)
+    {
+        $user = User::with('package')->find($userId);
         
         if (!$user || !$user->package) {
-            return [];
+            return null;
         }
-        
-        $usage = $this->calculateMonthlyUsage($userId);
+
+        $currentUsage = $this->calculateMonthlyUsage($userId);
         $quotaBytes = $user->package->quota_gb * 1024 * 1024 * 1024;
         
-        $usageGb = $usage / (1024**3);
-        $quotaGb = $user->package->quota_gb;
-        $percentage = $quotaGb > 0 ? ($usageGb / $quotaGb) * 100 : 0;
-        
+        $fupRecord = DB::table('fup_usage')
+            ->where('user_id', $userId)
+            ->where('usage_date', now()->format('Y-m-01'))
+            ->first();
+
         return [
-            'usage_bytes' => $usage,
-            'usage_gb' => round($usageGb, 2),
-            'quota_gb' => $quotaGb,
-            'remaining_gb' => round(max(0, $quotaGb - $usageGb), 2),
-            'percentage_used' => round($percentage, 2),
+            'user_id' => $userId,
+            'username' => $user->username,
+            'package_name' => $user->package->name,
+            'usage_gb' => round($currentUsage / 1024 / 1024 / 1024, 2),
+            'quota_gb' => $user->package->quota_gb,
+            'remaining_gb' => max(0, round(($quotaBytes - $currentUsage) / 1024 / 1024 / 1024, 2)),
+            'percentage_used' => $quotaBytes > 0 ? round(($currentUsage / $quotaBytes) * 100, 2) : 0,
             'fup_enabled' => $user->package->fup_enabled,
             'fup_speed' => $user->package->fup_speed,
             'current_speed' => $user->package->speed,
-            'is_fup_applied' => $percentage >= 100 && $user->package->fup_enabled,
-            'days_until_reset' => now()->endOfMonth()->diffInDays(now())
+            'is_fup_applied' => $fupRecord ? $fupRecord->fup_applied : false,
+            'fup_applied_at' => $fupRecord ? $fupRecord->fup_applied_at : null,
+            'days_until_reset' => now()->endOfMonth()->diffInDays(now()) + 1,
+            'reset_date' => now()->addMonth()->startOfMonth()->format('Y-m-d')
         ];
     }
-    
+
     /**
-     * Reset monthly usage (called on 1st of each month)
+     * Check FUP for all users
      */
-    public function resetMonthlyUsage(): int
+    public function checkAllUsersFup()
     {
-        // Archive previous month's data
-        DB::table('fup_usage')
-            ->where('usage_date', '<', now()->startOfMonth())
-            ->delete();
-            
-        Log::info("Monthly FUP usage reset completed");
+        $results = [];
         
-        return DB::table('fup_usage')->count();
+        // Get all users with FUP enabled packages
+        $users = User::whereHas('package', function ($q) {
+            $q->where('fup_enabled', true);
+        })->with('package')->get();
+
+        foreach ($users as $user) {
+            $result = $this->checkUserFup($user->id);
+            $results[] = [
+                'user_id' => $user->id,
+                'username' => $user->username,
+                'result' => $result
+            ];
+        }
+
+        Log::info("FUP check completed for " . count($users) . " users", [
+            'total_users' => count($users),
+            'results_summary' => collect($results)->groupBy('result.status')->map->count()
+        ]);
+
+        return $results;
+    }
+
+    /**
+     * Reset monthly FUP for all users
+     */
+    public function resetMonthlyFup()
+    {
+        try {
+            DB::beginTransaction();
+
+            // Get all users who had FUP applied last month
+            $lastMonth = now()->subMonth()->format('Y-m-01');
+            $fupUsers = DB::table('fup_usage')
+                ->join('users', 'fup_usage.user_id', '=', 'users.id')
+                ->join('packages', 'users.package_id', '=', 'packages.id')
+                ->where('fup_usage.usage_date', $lastMonth)
+                ->where('fup_usage.fup_applied', true)
+                ->select('users.*', 'packages.speed as original_speed', 'fup_usage.original_speed')
+                ->get();
+
+            $resetCount = 0;
+            foreach ($fupUsers as $user) {
+                // Send COA to restore original speed
+                $coaResult = $this->coaService->changeUserSpeed(
+                    $user->username,
+                    $user->original_speed ?: $user->speed,
+                    config('radius.default_nas_ip'),
+                    config('radius.secret')
+                );
+
+                if ($coaResult['success']) {
+                    $resetCount++;
+                }
+            }
+
+            // Archive last month's data and prepare for new month
+            DB::table('fup_usage')
+                ->where('usage_date', $lastMonth)
+                ->update(['updated_at' => now()]);
+
+            DB::commit();
+
+            Log::info("Monthly FUP reset completed", [
+                'total_users' => count($fupUsers),
+                'reset_count' => $resetCount,
+                'last_month' => $lastMonth
+            ]);
+
+            return [
+                'success' => true,
+                'message' => "FUP reset completed for {$resetCount} users",
+                'total_users' => count($fupUsers),
+                'reset_count' => $resetCount
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to reset monthly FUP: " . $e->getMessage());
+            
+            return [
+                'success' => false,
+                'message' => 'Failed to reset monthly FUP: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Get FUP dashboard statistics
+     */
+    public function getDashboardStats()
+    {
+        $currentMonth = now()->format('Y-m-01');
+        
+        $stats = [
+            'total_fup_users' => User::whereHas('package', function ($q) {
+                $q->where('fup_enabled', true);
+            })->count(),
+            
+            'fup_applied_count' => DB::table('fup_usage')
+                ->where('usage_date', $currentMonth)
+                ->where('fup_applied', true)
+                ->count(),
+                
+            'warning_users_count' => $this->getWarningUsersCount(),
+            
+            'total_quota_used_gb' => round(
+                DB::table('fup_usage')
+                    ->where('usage_date', $currentMonth)
+                    ->sum('total_bytes') / 1024 / 1024 / 1024,
+                2
+            ),
+            
+            'avg_usage_percentage' => $this->getAverageUsagePercentage(),
+        ];
+
+        return $stats;
+    }
+
+    /**
+     * Get count of users in warning zone (80%+ usage)
+     */
+    private function getWarningUsersCount()
+    {
+        return DB::table('fup_usage')
+            ->join('users', 'fup_usage.user_id', '=', 'users.id')
+            ->join('packages', 'users.package_id', '=', 'packages.id')
+            ->where('fup_usage.usage_date', now()->format('Y-m-01'))
+            ->whereRaw('(fup_usage.total_bytes / fup_usage.quota_bytes) >= 0.8')
+            ->where('fup_usage.fup_applied', false)
+            ->count();
+    }
+
+    /**
+     * Get average usage percentage across all FUP users
+     */
+    private function getAverageUsagePercentage()
+    {
+        $result = DB::table('fup_usage')
+            ->where('usage_date', now()->format('Y-m-01'))
+            ->where('quota_bytes', '>', 0)
+            ->selectRaw('AVG((total_bytes / quota_bytes) * 100) as avg_percentage')
+            ->first();
+
+        return $result ? round($result->avg_percentage, 2) : 0;
     }
 }

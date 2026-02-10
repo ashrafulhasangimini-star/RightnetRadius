@@ -1,60 +1,46 @@
 import { useState } from 'react'
 import './LoginPage.css'
+import api from './lib/api'
 
 function LoginPage({ onLogin }) {
-  const [email, setEmail] = useState('admin@rightnet.local')
-  const [password, setPassword] = useState('password')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [loginType, setLoginType] = useState('admin') // 'admin' or 'customer'
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    // Mock admin authentication
-    if (loginType === 'admin') {
-      if (email === 'admin@rightnet.local' && password === 'password') {
-        const adminData = {
-          id: 1,
-          name: 'System Admin',
-          email: 'admin@rightnet.local',
-          token: 'admin-token-' + Date.now(),
-        }
-        onLogin(adminData, 'admin')
-      } else {
-        setError('Invalid admin credentials')
-        setLoading(false)
-      }
-    } 
-    // Mock customer authentication
-    else if (loginType === 'customer') {
-      if (email === 'customer@example.com' && password === 'password') {
-        const customerData = {
-          id: 100,
-          name: 'Rajib Khan',
-          email: 'customer@example.com',
-          token: 'customer-token-' + Date.now(),
-        }
-        onLogin(customerData, 'customer')
-      } else {
-        setError('Invalid customer credentials')
-        setLoading(false)
-      }
+    // DEMO MODE: Direct login without API for testing
+    const demoUser = {
+      id: 1,
+      username: email,
+      name: email === 'admin' ? 'System Admin' : 'Test User',
+      email: email + '@example.com',
+      status: 'active'
     }
+    
+    const demoToken = 'demo-token-' + Date.now()
+    const userType = loginType
+    
+    console.log('Demo login for:', demoUser.username, 'as', userType)
+    
+    // Save to localStorage
+    localStorage.setItem('user', JSON.stringify(demoUser))
+    localStorage.setItem('userType', userType)
+    localStorage.setItem('token', demoToken)
+    
+    onLogin(demoUser, userType)
   }
 
   const handleTabChange = (type) => {
     setLoginType(type)
     setError('')
-    if (type === 'admin') {
-      setEmail('admin@rightnet.local')
-      setPassword('password')
-    } else {
-      setEmail('customer@example.com')
-      setPassword('password')
-    }
+    setEmail('')
+    setPassword('')
   }
 
   return (

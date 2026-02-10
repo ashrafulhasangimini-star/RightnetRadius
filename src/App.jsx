@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import LoginPage from './pages/LoginPage'
 import AdminDashboard from './pages/AdminDashboard'
-import CustomerDashboard from './pages/CustomerDashboard'
+import UserDashboard from './pages/UserDashboard'
 
 function App() {
   const [user, setUser] = useState(null)
@@ -19,7 +19,7 @@ function App() {
     
     console.log('Saved user:', savedUser)
     console.log('Saved userType:', savedUserType)
-    console.log('Saved token:', savedToken)
+    console.log('Saved token:', savedToken ? 'exists' : 'missing')
     
     if (savedUser && savedUserType && savedToken) {
       try {
@@ -97,8 +97,8 @@ function App() {
     return <AdminDashboard admin={user} onLogout={handleLogout} />
   }
 
-  console.log('Showing CustomerDashboard')
-  return <CustomerDashboard admin={user} onLogout={handleLogout} />
+  console.log('Showing UserDashboard')
+  return <UserDashboard admin={user} onLogout={handleLogout} />
 }
 
 export default App
