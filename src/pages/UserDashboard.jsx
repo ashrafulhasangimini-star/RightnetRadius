@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Home, Wifi, Clock, AlertCircle, Settings, LogOut, Bell, 
-  User, ArrowDown, ArrowUp, Download, Activity, CheckCircle
+  User, ArrowDown, ArrowUp, Download, Activity, CheckCircle, Menu, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { dashboardAPI } from '../lib/api';
 
@@ -72,11 +72,11 @@ export default function UserDashboard({ admin, onLogout }) {
   }, [admin]);
 
   const customerMenu = [
-    { id: 'overview', label: 'Overview', icon: Home },
-    { id: 'usage', label: 'Data Usage', icon: Wifi },
-    { id: 'billing', label: 'Billing', icon: Clock },
-    { id: 'support', label: 'Support', icon: AlertCircle },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'overview', label: 'সারসংক্ষেপ', icon: Home },
+    { id: 'usage', label: 'ডেটা ব্যবহার', icon: Wifi },
+    { id: 'billing', label: 'বিলিং', icon: Clock },
+    { id: 'support', label: 'সহায়তা', icon: AlertCircle },
+    { id: 'settings', label: 'সেটিংস', icon: Settings },
   ];
 
   const calculateUsagePercentage = () => {
@@ -237,6 +237,14 @@ export default function UserDashboard({ admin, onLogout }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+      {/* Mobile Overlay Backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-50 flex w-72.5 flex-col bg-gradient-to-b from-blue-900 to-blue-800 duration-300 ease-linear ${
@@ -251,6 +259,21 @@ export default function UserDashboard({ admin, onLogout }) {
               Rightnet
             </span>
           </a>
+          {/* Toggle Button for Desktop */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="hidden lg:flex text-white hover:bg-white/10 rounded-lg p-2 transition-transform duration-300"
+            title={sidebarOpen ? 'Collapse Menu' : 'Expand Menu'}
+          >
+            {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
+          {/* Close Button for Mobile */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-white hover:bg-white/10 rounded-lg p-2"
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
 
         {/* Sidebar Menu */}
@@ -262,7 +285,10 @@ export default function UserDashboard({ admin, onLogout }) {
                 return (
                   <li key={item.id}>
                     <button
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setSidebarOpen(false);
+                      }}
                       className={`group relative flex w-full items-center gap-2.5 rounded-sm px-4 py-2 font-medium text-white/80 duration-300 ease-in-out hover:bg-white/10 ${
                         activeTab === item.id && 'bg-white/20'
                       }`}

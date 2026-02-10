@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, FileText, Settings, LogOut, 
   Menu, X, ChevronDown, Wifi, Activity, 
-  TrendingUp, AlertCircle, CheckCircle, Clock
+  TrendingUp, AlertCircle, CheckCircle, Clock, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { dashboardAPI } from '../lib/api';
 
@@ -72,10 +72,10 @@ export default function AdminDashboard({ admin, onLogout }) {
   }, []);
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'users', label: 'Users', icon: Users },
-    { id: 'audit', label: 'Audit Logs', icon: FileText },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'dashboard', label: 'ড্যাশবোর্ড', icon: LayoutDashboard },
+    { id: 'users', label: 'ব্যবহারকারী', icon: Users },
+    { id: 'audit', label: 'অডিট লগ', icon: FileText },
+    { id: 'settings', label: 'সেটিংস', icon: Settings },
   ];
 
   const renderStatCard = (title, value, icon, color, trend) => (
@@ -280,6 +280,14 @@ export default function AdminDashboard({ admin, onLogout }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+      {/* Mobile Overlay Backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-50 flex w-72.5 flex-col bg-black duration-300 ease-linear dark:bg-boxdark ${
@@ -294,6 +302,21 @@ export default function AdminDashboard({ admin, onLogout }) {
               RightnetRadius
             </span>
           </a>
+          {/* Toggle Button for Desktop */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="hidden lg:flex text-white hover:bg-gray-800 rounded-lg p-2 transition-transform duration-300"
+            title={sidebarOpen ? 'Collapse Menu' : 'Expand Menu'}
+          >
+            {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
+          {/* Close Button for Mobile */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-white hover:bg-gray-800 rounded-lg p-2"
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
 
         {/* Sidebar Menu */}
@@ -301,7 +324,7 @@ export default function AdminDashboard({ admin, onLogout }) {
           <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
             <div>
               <h3 className={`mb-4 ml-4 text-sm font-semibold text-bodydark2 ${!sidebarOpen && 'lg:hidden'}`}>
-                MENU
+                মেনু
               </h3>
 
               <ul className="mb-6 flex flex-col gap-1.5">
@@ -312,9 +335,7 @@ export default function AdminDashboard({ admin, onLogout }) {
                       <button
                         onClick={() => {
                           setActiveTab(item.id);
-                          if (window.innerWidth < 1024) {
-                            setSidebarOpen(false);
-                          }
+                          setSidebarOpen(false);
                         }}
                         className={`group relative flex w-full items-center gap-2.5 rounded-sm px-4 py-2 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
                           activeTab === item.id && 'bg-graydark dark:bg-meta-4'
