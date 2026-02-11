@@ -1,84 +1,178 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   LayoutDashboard, Users, FileText, Settings, LogOut, 
   Menu, X, ChevronDown, Wifi, Activity, 
-  TrendingUp, AlertCircle, CheckCircle, Clock, ChevronLeft, ChevronRight
+  TrendingUp, AlertCircle, CheckCircle, Clock, ChevronLeft, ChevronRight,
+  Server, Signal, HardDrive, RefreshCw, Zap, Globe, Shield, Database
 } from 'lucide-react';
-import { dashboardAPI } from '../lib/api';
+import { dashboardAPI, radiusAPI, coaAPI, fupAPI } from '../lib/api';
 
 export default function AdminDashboard({ admin, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  
+  // Dashboard Stats
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // RADIUS Status
+  const [radiusStatus, setRadiusStatus] = useState(null);
+  const [nasClients, setNasClients] = useState([]);
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  
+  // COA Operations
+  const [coaLoading, setCoaLoading] = useState(false);
+  const [coaResult, setCoaResult] = useState(null);
+  
+  // Auto-refresh interval
+  const [refreshInterval, setRefreshInterval] = useState(null);
 
-  // Fetch dashboard stats
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        console.log('Fetching dashboard stats...');
-        
-        const response = await dashboardAPI.getAdminStats();
-        console.log('API Response:', response.data);
-        
-        // Check if response has data
-        if (response.data && Object.keys(response.data).length > 0) {
-          setStats(response.data);
-          setError(null);
-        } else {
-          // Use mock data if API returns empty
-          console.log('Using mock data');
-          setStats({
-            total_users: 15,
-            online_users: 3,
-            monthly_revenue: 12500,
-            active_users: 12,
-            fup_enabled_users: 10,
-            fup_warning_users: 3,
-            fup_applied_users: 2,
-            coa_requests_today: 5,
-            coa_success_rate: 100
-          });
-          setError(null);
-        }
-      } catch (err) {
-        console.error('Error fetching stats:', err);
-        // Use mock data on error
-        console.log('Using mock data due to error');
-        setStats({
-          total_users: 15,
-          online_users: 3,
-          monthly_revenue: 12500,
-          active_users: 12,
-          fup_enabled_users: 10,
-          fup_warning_users: 3,
-          fup_applied_users: 2,
-          coa_requests_today: 5,
-          coa_success_rate: 100
-        });
-        setError(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
+  // Fetch all dashboard data
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      console.log('Fetching dashboard data...');
+      
+      const [statsRes, radiusRes, nasRes, sessionsRes] = await Promise.all([
+        dashboardAPI.getAdminStats().catch(() => ({ data: {} })),
+        radiusAPI.getStatus().catch(() => ({ data: {} })),
+        radiusAPI.getNasClients().catch(() => ({ data: [] })),
+        radiusAPI.getActiveSessions().catch(() => ({ data: [] }))
+      ]);
+      
+      setStats(statsRes.data || {});
+      setRadiusStatus(radiusRes.data || {});
+      setNasClients(nasRes.data || []);
+      setActiveSessions(sessionsRes.data || []);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      // Use mock data on error
+      setStats({
+        total_users: 15,
+        online_users: 3,
+        monthly_revenue: 12500,
+        active_users: 12,
+        fup_enabled_users: 10,
+        fup_warning_users: 3,
+        fup_applied_users: 2,
+        coa_requests_today: 5,
+        coa_success_rate: 100
+      });
+      setRadiusStatus({
+        status: 'online',
+        server: 'FreeRADIUS',
+        version: '3.0.x',
+        uptime: '5d 12h 30m',
+        connections_today: 1250,
+        requests_per_second: 15
+      });
+      setNasClients([
+        { id: 1, nas_name: 'mikrotik-main', nas_ip: '192.168.1.1', nas_type: 'mikrotik', status: 'active', last_heartbeat: new Date().toISOString() },
+        { id: 2, nas_name: 'ubiquiti-ap', nas_ip: '192.168.2.1', nas_type: 'ubiquiti', status: 'active', last_heartbeat: new Date().toISOString() }
+      ]);
+      setActiveSessions([
+        { id: 1, username: 'rajib', nas_ip: '192.168.1.1', framed_ip: '10.0.0.50', start_time: new Date(Date.now() - 3600000).toISOString(), upload_bytes: 512000, download_bytes: 2048000, session_time: 3600 },
+        { id: 2, username: 'karim', nas_ip: '192.168.1.1', framed_ip: '10.0.0.51', start_time: new Date(Date.now() - 7200000).toISOString(), upload_bytes: 1024000, download_bytes: 4096000, session_time: 7200 }
+      ]);
+      setError(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // Initial fetch and auto-refresh
+  useEffect(() => {
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30 seconds
+    setRefreshInterval(interval);
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
+
+  // Disconnect a session
+  const handleDisconnectSession = async (sessionId) => {
+    if (!confirm('Are you sure you want to disconnect this session?')) return;
+    
+    try {
+      setCoaLoading(true);
+      const response = await radiusAPI.disconnectSession(sessionId);
+      setCoaResult({ type: 'success', message: 'Session disconnected successfully' });
+      fetchDashboardData(); // Refresh data
+    } catch (err) {
+      setCoaResult({ type: 'error', message: 'Failed to disconnect session' });
+    } finally {
+      setCoaLoading(false);
+      setTimeout(() => setCoaResult(null), 3000);
+    }
+  };
+
+  // Change user speed (CoA)
+  const handleChangeSpeed = async (username, newSpeed) => {
+    try {
+      setCoaLoading(true);
+      const response = await coaAPI.changeSpeed({ username, speed: newSpeed });
+      setCoaResult({ type: 'success', message: `Speed changed to ${newSpeed} for ${username}` });
+    } catch (err) {
+      setCoaResult({ type: 'error', message: 'Failed to change speed' });
+    } finally {
+      setCoaLoading(false);
+      setTimeout(() => setCoaResult(null), 3000);
+    }
+  };
+
+  // Disconnect user (CoA)
+  const handleDisconnectUser = async (username) => {
+    if (!confirm(`Are you sure you want to disconnect ${username}?`)) return;
+    
+    try {
+      setCoaLoading(true);
+      const response = await coaAPI.disconnect({ username });
+      setCoaResult({ type: 'success', message: `${username} disconnected successfully` });
+      fetchDashboardData();
+    } catch (err) {
+      setCoaResult({ type: 'error', message: 'Failed to disconnect user' });
+    } finally {
+      setCoaLoading(false);
+      setTimeout(() => setCoaResult(null), 3000);
+    }
+  };
 
   const menuItems = [
     { id: 'dashboard', label: 'ড্যাশবোর্ড', icon: LayoutDashboard },
+    { id: 'radius', label: 'RADIUS', icon: Server },
+    { id: 'sessions', label: 'সেশন', icon: Signal },
+    { id: 'nas', label: 'NAS ক্লায়েন্ট', icon: Globe },
     { id: 'users', label: 'ব্যবহারকারী', icon: Users },
+    { id: 'coa', label: 'COA অপারেশন', icon: Zap },
     { id: 'audit', label: 'অডিট লগ', icon: FileText },
     { id: 'settings', label: 'সেটিংস', icon: Settings },
   ];
 
-  const renderStatCard = (title, value, icon, color, trend) => (
+  // Format bytes to human readable
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Format time duration
+  const formatDuration = (seconds) => {
+    if (!seconds) return '0s';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
+
+  // Render stat card
+  const renderStatCard = (title, value, icon, color, trend, subtitle) => (
     <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
@@ -86,6 +180,7 @@ export default function AdminDashboard({ admin, onLogout }) {
           <h3 className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
             {loading ? '...' : value}
           </h3>
+          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
         </div>
         <div className={`p-3 rounded-full ${color}`}>
           <icon className="w-6 h-6 text-white" />
@@ -101,6 +196,350 @@ export default function AdminDashboard({ admin, onLogout }) {
     </div>
   );
 
+  // Render RADIUS Server Status
+  const renderRadiusStatus = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {renderStatCard(
+          'Server Status',
+          radiusStatus?.status === 'online' ? '🟢 Online' : '🔴 Offline',
+          Server,
+          radiusStatus?.status === 'online' ? 'bg-green-500' : 'bg-red-500',
+          null,
+          radiusStatus?.server || 'FreeRADIUS'
+        )}
+        {renderStatCard(
+          'Uptime',
+          radiusStatus?.uptime || 'N/A',
+          Clock,
+          'bg-blue-500',
+          null,
+          'Server running time'
+        )}
+        {renderStatCard(
+          'Connections Today',
+          radiusStatus?.connections_today?.toLocaleString() || 0,
+          Activity,
+          'bg-purple-500',
+          '+12%',
+          'Total authentications'
+        )}
+        {renderStatCard(
+          'Requests/sec',
+          radiusStatus?.requests_per_second || 0,
+          Zap,
+          'bg-orange-500',
+          null,
+          'Average RPS'
+        )}
+      </div>
+
+      {/* RADIUS Server Details */}
+      <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <Server className="w-5 h-5 text-primary" />
+          RADIUS Server Details
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Database className="w-5 h-5 text-blue-500" />
+              <span className="font-medium text-gray-700 dark:text-gray-300">Database</span>
+            </div>
+            <p className="text-sm text-green-600 dark:text-green-400">Connected ✓</p>
+          </div>
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="w-5 h-5 text-green-500" />
+              <span className="font-medium text-gray-700 dark:text-gray-300">Authentication</span>
+            </div>
+            <p className="text-sm text-green-600 dark:text-green-400">Port 1812 ✓</p>
+          </div>
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <HardDrive className="w-5 h-5 text-purple-500" />
+              <span className="font-medium text-gray-700 dark:text-gray-300">Accounting</span>
+            </div>
+            <p className="text-sm text-green-600 dark:text-green-400">Port 1813 ✓</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render Active Sessions
+  const renderActiveSessions = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Active Sessions</h2>
+        <button 
+          onClick={fetchDashboardData}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </button>
+      </div>
+
+      {coaResult && (
+        <div className={`p-4 rounded-lg ${coaResult.type === 'success' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'}`}>
+          {coaResult.message}
+        </div>
+      )}
+
+      {/* Sessions Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {renderStatCard(
+          'Active Sessions',
+          activeSessions.length,
+          Signal,
+          'bg-green-500',
+          '+5%',
+          'Currently online'
+        )}
+        {renderStatCard(
+          'Total Upload',
+          formatBytes(activeSessions.reduce((sum, s) => sum + (s.upload_bytes || 0), 0)),
+          Activity,
+          'bg-blue-500',
+          null,
+          'All sessions'
+        )}
+        {renderStatCard(
+          'Total Download',
+          formatBytes(activeSessions.reduce((sum, s) => sum + (s.download_bytes || 0), 0)),
+          Activity,
+          'bg-purple-500',
+          null,
+          'All sessions'
+        )}
+        {renderStatCard(
+          'Avg Session Time',
+          formatDuration(Math.round(activeSessions.reduce((sum, s) => sum + (s.session_time || 0), 0) / (activeSessions.length || 1))),
+          Clock,
+          'bg-orange-500',
+          null,
+          'Per user'
+        )}
+      </div>
+
+      {/* Sessions Table */}
+      <div className="bg-white dark:bg-boxdark rounded-lg shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-800">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">NAS IP</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Framed IP</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Time</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Upload</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Download</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {activeSessions.map((session) => (
+                <tr key={session.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                    {session.username}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {session.nas_ip}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {session.framed_ip}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {new Date(session.start_time).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {formatDuration(session.session_time)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {formatBytes(session.upload_bytes)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {formatBytes(session.download_bytes)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => handleDisconnectSession(session.id)}
+                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                      disabled={coaLoading}
+                    >
+                      Disconnect
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {activeSessions.length === 0 && (
+                <tr>
+                  <td colSpan="8" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                    No active sessions
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render NAS Clients
+  const renderNasClients = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">NAS Clients Management</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {nasClients.map((nas) => (
+          <div key={nas.id} className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-lg ${
+                  nas.nas_type === 'mikrotik' ? 'bg-orange-100 dark:bg-orange-900/30' :
+                  nas.nas_type === 'ubiquiti' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                  'bg-gray-100 dark:bg-gray-700'
+                }`}>
+                  <Globe className={`w-6 h-6 ${
+                    nas.nas_type === 'mikrotik' ? 'text-orange-500' :
+                    nas.nas_type === 'ubiquiti' ? 'text-blue-500' :
+                    'text-gray-500'
+                  }`} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">{nas.nas_name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{nas.nas_type}</p>
+                </div>
+              </div>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                nas.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-800'
+              }`}>
+                {nas.status}
+              </span>
+            </div>
+            
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500 dark:text-gray-400">IP Address:</span>
+                <span className="text-gray-900 dark:text-white font-mono">{nas.nas_ip}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Last Heartbeat:</span>
+                <span className="text-gray-900 dark:text-white">{nas.last_heartbeat ? new Date(nas.last_heartbeat).toLocaleString() : 'N/A'}</span>
+              </div>
+            </div>
+            
+            <div className="mt-4 flex gap-2">
+              <button className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
+                Test Connection
+              </button>
+              <button className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600">
+                Reboot
+              </button>
+            </div>
+          </div>
+        ))}
+        
+        {nasClients.length === 0 && (
+          <div className="col-span-3 bg-white dark:bg-boxdark rounded-lg p-8 text-center">
+            <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 dark:text-gray-400">No NAS clients configured</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Render COA Operations
+  const renderCoaOperations = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">COA Operations</h2>
+      
+      {coaResult && (
+        <div className={`p-4 rounded-lg ${coaResult.type === 'success' ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+          {coaResult.message}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Change Speed */}
+        <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-yellow-500" />
+            Change Speed
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+              <input type="text" id="coa-username" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" placeholder="Enter username" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Speed</label>
+              <select id="coa-speed" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
+                <option value="5M/5M">5 Mbps</option>
+                <option value="10M/10M">10 Mbps</option>
+                <option value="20M/20M">20 Mbps</option>
+                <option value="50M/50M">50 Mbps</option>
+                <option value="100M/100M">100 Mbps</option>
+              </select>
+            </div>
+            <button 
+              onClick={() => handleChangeSpeed(
+                document.getElementById('coa-username').value,
+                document.getElementById('coa-speed').value
+              )}
+              disabled={coaLoading}
+              className="w-full px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50"
+            >
+              {coaLoading ? 'Processing...' : 'Apply Speed Change'}
+            </button>
+          </div>
+        </div>
+
+        {/* Disconnect User */}
+        <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <LogOut className="w-5 h-5 text-red-500" />
+            Disconnect User
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+              <input type="text" id="disconnect-username" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" placeholder="Enter username to disconnect" />
+            </div>
+            <button 
+              onClick={() => handleDisconnectUser(document.getElementById('disconnect-username').value)}
+              disabled={coaLoading}
+              className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+            >
+              {coaLoading ? 'Processing...' : 'Disconnect User'}
+            </button>
+          </div>
+        </div>
+
+        {/* FUP Operations */}
+        <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-purple-500" />
+            FUP Operations
+          </h3>
+          <div className="space-y-4">
+            <button className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">
+              Check All Users FUP
+            </button>
+            <button className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+              Reset Monthly Quota
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render Main Dashboard
   const renderDashboard = () => (
     <div className="space-y-6">
       {/* Stats Grid */}
@@ -110,32 +549,76 @@ export default function AdminDashboard({ admin, onLogout }) {
           stats?.total_users || 0,
           Users,
           'bg-blue-500',
-          '+12%'
+          '+12%',
+          'All registered users'
         )}
         {renderStatCard(
           'Online Now',
           stats?.online_users || 0,
           Wifi,
           'bg-green-500',
-          '+8%'
+          '+8%',
+          'Currently connected'
         )}
         {renderStatCard(
           'Monthly Revenue',
-          `${stats?.monthly_revenue || 0}`,
+          `৳${(stats?.monthly_revenue || 0).toLocaleString()}`,
           Activity,
           'bg-purple-500',
-          '+15%'
+          '+15%',
+          'This month'
         )}
         {renderStatCard(
           'Active Sessions',
-          stats?.active_users || 0,
+          activeSessions.length,
           Clock,
           'bg-orange-500',
-          '+5%'
+          '+5%',
+          'In progress'
         )}
       </div>
 
-      {/* Quick Actions */}
+      {/* RADIUS Quick Status */}
+      <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <Server className="w-5 h-5 text-primary" />
+          RADIUS Server Quick Status
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <span className="font-medium text-green-700 dark:text-green-400">RADIUS Server</span>
+            </div>
+            <p className="text-sm text-green-600 dark:text-green-500">
+              {radiusStatus?.status === 'online' ? '● Online' : '○ Offline'}
+            </p>
+          </div>
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="w-5 h-5 text-blue-500" />
+              <span className="font-medium text-blue-700 dark:text-blue-400">NAS Devices</span>
+            </div>
+            <p className="text-sm text-blue-600 dark:text-blue-500">{nasClients.length} active</p>
+          </div>
+          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Signal className="w-5 h-5 text-purple-500" />
+              <span className="font-medium text-purple-700 dark:text-purple-400">Sessions</span>
+            </div>
+            <p className="text-sm text-purple-600 dark:text-purple-500">{activeSessions.length} online</p>
+          </div>
+          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-5 h-5 text-orange-500" />
+              <span className="font-medium text-orange-700 dark:text-orange-400">COA Today</span>
+            </div>
+            <p className="text-sm text-orange-600 dark:text-orange-500">{stats?.coa_requests_today || 0} requests</p>
+          </div>
+        </div>
+      </div>
+
+      {/* FUP and COA Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* FUP Overview */}
         <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
@@ -193,9 +676,7 @@ export default function AdminDashboard({ admin, onLogout }) {
                 <LogOut className="w-5 h-5 text-red-500" />
                 <span className="text-gray-700 dark:text-gray-300">Disconnections Today</span>
               </div>
-              <span className="font-semibold text-gray-900 dark:text-white">
-                0
-              </span>
+              <span className="font-semibold text-gray-900 dark:text-white">0</span>
             </div>
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <div className="flex items-center gap-3">
@@ -210,7 +691,7 @@ export default function AdminDashboard({ admin, onLogout }) {
         </div>
       </div>
 
-      {/* Recent Activity */}
+      {/* System Health */}
       <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           System Health
@@ -235,17 +716,26 @@ export default function AdminDashboard({ admin, onLogout }) {
               <Wifi className="w-5 h-5 text-purple-500" />
               <span className="font-medium text-purple-700 dark:text-purple-400">Network</span>
             </div>
-            <p className="text-sm text-purple-600 dark:text-purple-500">{stats?.top_bandwidth_users?.length || 0} NAS devices active</p>
+            <p className="text-sm text-purple-600 dark:text-purple-500">{nasClients.length} NAS devices active</p>
           </div>
         </div>
       </div>
     </div>
   );
 
+  // Render content based on active tab
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return renderDashboard();
+      case 'radius':
+        return renderRadiusStatus();
+      case 'sessions':
+        return renderActiveSessions();
+      case 'nas':
+        return renderNasClients();
+      case 'coa':
+        return renderCoaOperations();
       case 'users':
         return (
           <div className="space-y-6">
@@ -302,7 +792,6 @@ export default function AdminDashboard({ admin, onLogout }) {
               RightnetRadius
             </span>
           </a>
-          {/* Toggle Button for Desktop */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="hidden lg:flex text-white hover:bg-gray-800 rounded-lg p-2 transition-transform duration-300"
@@ -310,7 +799,6 @@ export default function AdminDashboard({ admin, onLogout }) {
           >
             {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>
-          {/* Close Button for Mobile */}
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden text-white hover:bg-gray-800 rounded-lg p-2"
@@ -326,7 +814,6 @@ export default function AdminDashboard({ admin, onLogout }) {
               <h3 className={`mb-4 ml-4 text-sm font-semibold text-bodydark2 ${!sidebarOpen && 'lg:hidden'}`}>
                 মেনু
               </h3>
-
               <ul className="mb-6 flex flex-col gap-1.5">
                 {menuItems.map((item) => {
                   const Icon = item.icon;

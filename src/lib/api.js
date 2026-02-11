@@ -117,4 +117,35 @@ export const packagesAPI = {
     getList: () => api.get('/packages/list'),
 };
 
+export const radiusAPI = {
+    // RADIUS Server Status
+    getStatus: () => api.get('/radius/status'),
+    getServerInfo: () => api.get('/radius/server-info'),
+    
+    // NAS Clients
+    getNasClients: () => api.get('/radius/nas-clients'),
+    addNasClient: (data) => api.post('/radius/nas-clients', data),
+    updateNasClient: (id, data) => api.put(`/radius/nas-clients/${id}`, data),
+    deleteNasClient: (id) => api.delete(`/radius/nas-clients/${id}`),
+    
+    // Active Sessions
+    getActiveSessions: () => api.get('/radius/sessions/active'),
+    getSessionHistory: (userId) => api.get(`/radius/sessions/history/${userId}`),
+    disconnectSession: (sessionId) => api.post(`/radius/sessions/disconnect/${sessionId}`),
+    
+    // User Accounting
+    getUserAccounting: (userId) => api.get(`/radius/accounting/${userId}`),
+    getAllAccounting: (params) => api.get('/radius/accounting', { params }),
+    
+    // CoA Operations
+    changeSpeed: (data) => api.post('/coa/change-speed', data),
+    disconnect: (data) => api.post('/coa/disconnect', data),
+    updateQuota: (data) => api.post('/coa/update-quota', data),
+    applyFup: (data) => api.post('/coa/apply-fup', data),
+    
+    // NAS Operations
+    rebootNas: (nasId) => api.post(`/radius/nas/${nasId}/reboot`),
+    testNas: (nasId) => api.post(`/radius/nas/${nasId}/test`),
+};
+
 export default api;
