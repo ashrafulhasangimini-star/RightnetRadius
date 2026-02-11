@@ -7,6 +7,12 @@ use App\Http\Controllers\Api\FupController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ReportsController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\PackageController;
+use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\NasClientController;
+use App\Http\Controllers\Api\TransactionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -69,6 +75,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('user', [AuthController::class, 'user']);
         Route::post('refresh', [AuthController::class, 'refresh']);
+    });
+
+    // Profile routes
+    Route::prefix('profile')->group(function () {
+        Route::get('/', [ProfileController::class, 'show']);
+        Route::put('/', [ProfileController::class, 'update']);
+        Route::post('avatar', [ProfileController::class, 'uploadAvatar']);
+        Route::put('password', [ProfileController::class, 'updatePassword']);
+        Route::put('notifications', [ProfileController::class, 'updateNotifications']);
     });
 
     // COA (Change of Authorization) routes
@@ -135,89 +150,97 @@ Route::middleware(['auth:sanctum'])->group(function () {
         });
     });
 
-    // User routes
+    // User Management routes
     Route::prefix('users')->group(function () {
-        Route::get('list', function() {
-            try {
-                $users = \App\Models\User::with('package')
-                    ->select('id', 'username', 'email', 'phone', 'status', 'package_id')
-                    ->limit(100)
-                    ->get();
-
-                return response()->json([
-                    'success' => true,
-                    'data' => $users
-                ]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $e->getMessage()
-                ], 500);
-            }
-        });
-
-        Route::get('{id}', function($id) {
-            try {
-                $user = \App\Models\User::with('package')->findOrFail($id);
-
-                return response()->json([
-                    'success' => true,
-                    'data' => $user
-                ]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found'
-                ], 404);
-            }
-        });
+        Route::get('list', [UserController::class, 'index']);
+        Route::get('{id}', [UserController::class, 'show']);
+        Route::post('create', [UserController::class, 'store']);
+        Route::put('{id}', [UserController::class, 'update']);
+        Route::delete('{id}', [UserController::class, 'destroy']);
+        Route::post('{id}/status', [UserController::class, 'changeStatus']);
+        Route::put('{id}/password', [UserController::class, 'updatePassword']);
+        Route::get('{id}/stats', [UserController::class, 'getUserStats']);
+        Route::get('{id}/sessions', [UserController::class, 'getUserSessions']);
+        Route::get('{id}/transactions', [UserController::class, 'getUserTransactions']);
+        Route::get('all', [UserController::class, 'all']);
     });
 
-    // Package routes
+    // Package Management routes
     Route::prefix('packages')->group(function () {
-        Route::get('list', function() {
-            try {
-                $packages = \DB::table('packages')
-                    ->select('id', 'name', 'speed', 'price', 'quota_gb', 'fup_speed', 'fup_enabled')
-                    ->where('status', 'active')
-                    ->get();
+        Route::get('list', [PackageController::class, 'index']);
+        Route::get('{id}', [PackageController::class, 'show']);
+        Route::post('create', [PackageController::class, 'store']);
+        Route::put('{id}', [PackageController::class, 'update']);
+        Route::delete('{id}', [PackageController::class, 'destroy']);
+        Route::post('{id}/toggle-status', [PackageController::class, 'toggleStatus']);
+        Route::get('{id}/stats', [PackageController::class, 'getPackageStats']);
+        Route::get('all', [PackageController::class, 'all']);
+    });
 
-                return response()->json([
-                    'success' => true,
-                    'data' => $packages
-                ]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $e->getMessage()
-                ], 500);
-            }
-        });
+    // Device Management routes
+    Route::prefix('devices')->group(function () {
+        Route::get('list', [DeviceController::class, 'index']);
+        Route::get('{id}', [DeviceController::class, 'show']);
+        Route::post('create', [DeviceController::class, 'store']);
+        Route::put('{id}', [DeviceController::class, 'update']);
+        Route::delete('{id}', [DeviceController::class, 'destroy']);
+        Route::post('{id}/test-connection', [DeviceController::class, 'testConnection']);
+        Route::get('{id}/stats', [DeviceController::class, 'getDeviceStats']);
+        Route::post('{id}/sync-users', [DeviceController::class, 'syncUsers']);
+        Route::post('{id}/toggle-status', [DeviceController::class, 'toggleStatus']);
+        Route::get('all', [DeviceController::class, 'all']);
+    });
+
+    // NAS Client Management routes
+    Route::prefix('radius')->group(function () {
+        Route::get('nas-clients', [NasClientController::class, 'index']);
+        Route::get('nas-clients/{id}', [NasClientController::class, 'show']);
+        Route::post('nas-clients', [NasClientController::class, 'store']);
+        Route::put('nas-clients/{id}', [NasClientController::class, 'update']);
+        Route::delete('nas-clients/{id}', [NasClientController::class, 'destroy']);
+        Route::post('nas-clients/{id}/toggle-status', [NasClientController::class, 'toggleStatus']);
+        Route::get('nas-clients-active', [NasClientController::class, 'getActiveClients']);
+        
+        // Session Management
+        Route::get('sessions/active', [NasClientController::class, 'activeSessions']);
+        Route::get('sessions/history/{userId}', [NasClientController::class, 'sessionHistory']);
+        Route::post('sessions/disconnect/{sessionId}', [NasClientController::class, 'disconnectSession']);
+        
+        // Server Status
+        Route::get('status', [NasClientController::class, 'serverStatus']);
+        Route::get('server-info', [NasClientController::class, 'serverInfo']);
+    });
+
+    // Transaction routes
+    Route::prefix('transactions')->group(function () {
+        Route::get('list', [TransactionController::class, 'index']);
+        Route::get('{id}', [TransactionController::class, 'show']);
+        Route::post('create', [TransactionController::class, 'store']);
+        Route::put('{id}/status', [TransactionController::class, 'updateStatus']);
+        Route::get('stats', [TransactionController::class, 'getStats']);
+        Route::get('payment-methods', [TransactionController::class, 'getPaymentMethods']);
+        Route::get('user/{userId}', [TransactionController::class, 'getUserTransactions']);
     });
 
     // Invoice routes
     Route::prefix('invoices')->group(function () {
         Route::get('list', function() {
+            $invoices = \DB::table('invoices')
+                ->orderBy('created_at', 'desc')
+                ->limit(100)
+                ->get();
+
             return response()->json([
                 'success' => true,
-                'data' => []
+                'data' => $invoices
             ]);
         });
 
         Route::get('{id}', function($id) {
+            $invoice = \DB::table('invoices')->find($id);
             return response()->json([
                 'success' => true,
-                'data' => []
-            ]);
-        });
-    });
-
-    // Transaction routes
-    Route::prefix('transactions')->group(function () {
-        Route::get('list', function() {
-            return response()->json([
-                'success' => true,
-                'data' => []
+                'data' => $invoice
             ]);
         });
     });
@@ -254,6 +277,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('user', [ReportsController::class, 'user']);
         Route::get('profit', [ReportsController::class, 'profit']);
         Route::get('usage', [ReportsController::class, 'usage']);
+        Route::get('revenue', [ReportsController::class, 'revenue']);
     });
 });
 

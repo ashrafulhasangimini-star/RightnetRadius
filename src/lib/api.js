@@ -108,13 +108,72 @@ export const coaAPI = {
     applyFup: (data) => api.post('/coa/apply-fup', data),
 };
 
+export const profileAPI = {
+    getProfile: () => api.get('/profile/'),
+    updateProfile: (data) => api.put('/profile/', data),
+    uploadAvatar: (formData) => api.post('/profile/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    updatePassword: (data) => api.put('/profile/password', data),
+    updateNotifications: (data) => api.put('/profile/notifications', data),
+};
+
 export const usersAPI = {
-    getList: () => api.get('/users/list'),
+    getList: (params) => api.get('/users/list', { params }),
     getUser: (id) => api.get(`/users/${id}`),
+    createUser: (data) => api.post('/users/create', data),
+    updateUser: (id, data) => api.put(`/users/${id}`, data),
+    deleteUser: (id) => api.delete(`/users/${id}`),
+    changeStatus: (id, status) => api.post(`/users/${id}/status`, { status }),
+    updatePassword: (id, password) => api.put(`/users/${id}/password`, { password }),
+    getUserStats: (id) => api.get(`/users/${id}/stats`),
+    getUserSessions: (id, params) => api.get(`/users/${id}/sessions`, { params }),
+    getUserTransactions: (id, params) => api.get(`/users/${id}/transactions`, { params }),
+    getAll: () => api.get('/users/all'),
 };
 
 export const packagesAPI = {
-    getList: () => api.get('/packages/list'),
+    getList: (params) => api.get('/packages/list', { params }),
+    getPackage: (id) => api.get(`/packages/${id}`),
+    createPackage: (data) => api.post('/packages/create', data),
+    updatePackage: (id, data) => api.put(`/packages/${id}`, data),
+    deletePackage: (id) => api.delete(`/packages/${id}`),
+    toggleStatus: (id) => api.post(`/packages/${id}/toggle-status`),
+    getPackageStats: (id) => api.get(`/packages/${id}/stats`),
+    getAll: () => api.get('/packages/all'),
+};
+
+export const devicesAPI = {
+    getList: (params) => api.get('/devices/list', { params }),
+    getDevice: (id) => api.get(`/devices/${id}`),
+    createDevice: (data) => api.post('/devices/create', data),
+    updateDevice: (id, data) => api.put(`/devices/${id}`, data),
+    deleteDevice: (id) => api.delete(`/devices/${id}`),
+    testConnection: (id) => api.post(`/devices/${id}/test-connection`),
+    getDeviceStats: (id) => api.get(`/devices/${id}/stats`),
+    syncUsers: (id) => api.post(`/devices/${id}/sync-users`),
+    toggleStatus: (id) => api.post(`/devices/${id}/toggle-status`),
+    getAll: () => api.get('/devices/all'),
+};
+
+export const transactionsAPI = {
+    getList: (params) => api.get('/transactions/list', { params }),
+    getTransaction: (id) => api.get(`/transactions/${id}`),
+    createTransaction: (data) => api.post('/transactions/create', data),
+    updateStatus: (id, status) => api.put(`/transactions/${id}/status`, { status }),
+    getStats: (params) => api.get('/transactions/stats', { params }),
+    getPaymentMethods: () => api.get('/transactions/payment-methods'),
+    getUserTransactions: (userId, params) => api.get(`/transactions/user/${userId}`, { params }),
+};
+
+export const nasClientsAPI = {
+    getList: (params) => api.get('/radius/nas-clients', { params }),
+    getClient: (id) => api.get(`/radius/nas-clients/${id}`),
+    createClient: (data) => api.post('/radius/nas-clients', data),
+    updateClient: (id, data) => api.put(`/radius/nas-clients/${id}`, data),
+    deleteClient: (id) => api.delete(`/radius/nas-clients/${id}`),
+    toggleStatus: (id) => api.post(`/radius/nas-clients/${id}/toggle-status`),
+    getActiveClients: () => api.get('/radius/nas-clients-active'),
 };
 
 export const radiusAPI = {

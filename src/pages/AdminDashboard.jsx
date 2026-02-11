@@ -6,7 +6,7 @@ import {
   Server, Signal, HardDrive, RefreshCw, Zap, Globe, Shield, Database,
   CreditCard, Package, Router, BarChart3, UserPlus, UserMinus, Eye, Search, User
 } from 'lucide-react';
-import { dashboardAPI, radiusAPI, coaAPI, fupAPI, usersAPI, packagesAPI } from '../lib/api';
+import { dashboardAPI, radiusAPI, coaAPI, fupAPI, usersAPI, packagesAPI, devicesAPI, transactionsAPI, profileAPI } from '../lib/api';
 
 // Import page components
 import UsersManagement from './UsersManagement';
