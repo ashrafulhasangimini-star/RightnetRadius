@@ -3,9 +3,18 @@ import {
   LayoutDashboard, Users, FileText, Settings, LogOut, 
   Menu, X, ChevronDown, Wifi, Activity, 
   TrendingUp, AlertCircle, CheckCircle, Clock, ChevronLeft, ChevronRight,
-  Server, Signal, HardDrive, RefreshCw, Zap, Globe, Shield, Database
+  Server, Signal, HardDrive, RefreshCw, Zap, Globe, Shield, Database,
+  CreditCard, Package, Router, BarChart3, UserPlus, UserMinus, Eye, Search
 } from 'lucide-react';
-import { dashboardAPI, radiusAPI, coaAPI, fupAPI } from '../lib/api';
+import { dashboardAPI, radiusAPI, coaAPI, fupAPI, usersAPI, packagesAPI } from '../lib/api';
+
+// Import page components
+import UsersManagement from './UsersManagement';
+import PackageManagement from './PackageManagement';
+import ReportsPage from './ReportsPage';
+import RechargePayment from './RechargePayment';
+import RadiusClient from './RadiusClient';
+import DeviceManagement from './DeviceManagement';
 
 export default function AdminDashboard({ admin, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -87,7 +96,7 @@ export default function AdminDashboard({ admin, onLogout }) {
   // Initial fetch and auto-refresh
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30 seconds
+    const interval = setInterval(fetchDashboardData, 30000);
     setRefreshInterval(interval);
     return () => clearInterval(interval);
   }, [fetchDashboardData]);
@@ -100,7 +109,7 @@ export default function AdminDashboard({ admin, onLogout }) {
       setCoaLoading(true);
       const response = await radiusAPI.disconnectSession(sessionId);
       setCoaResult({ type: 'success', message: 'Session disconnected successfully' });
-      fetchDashboardData(); // Refresh data
+      fetchDashboardData();
     } catch (err) {
       setCoaResult({ type: 'error', message: 'Failed to disconnect session' });
     } finally {
@@ -140,13 +149,17 @@ export default function AdminDashboard({ admin, onLogout }) {
     }
   };
 
+  // Menu items with icons
   const menuItems = [
     { id: 'dashboard', label: 'ড্যাশবোর্ড', icon: LayoutDashboard },
-    { id: 'radius', label: 'RADIUS', icon: Server },
-    { id: 'sessions', label: 'সেশন', icon: Signal },
-    { id: 'nas', label: 'NAS ক্লায়েন্ট', icon: Globe },
-    { id: 'users', label: 'ব্যবহারকারী', icon: Users },
+    { id: 'users', label: 'ইউজার ম্যানেজমেন্ট', icon: Users },
+    { id: 'packages', label: 'প্যাকেজ ম্যানেজমেন্ট', icon: Package },
+    { id: 'radius', label: 'র‍্যাডিয়াস ক্লায়েন্ট', icon: Server },
+    { id: 'devices', label: 'ডিভাইস ম্যানেজমেন্ট', icon: Router },
+    { id: 'sessions', label: 'সেশন ম্যানেজমেন্ট', icon: Signal },
     { id: 'coa', label: 'COA অপারেশন', icon: Zap },
+    { id: 'recharge', label: 'রিচার্জ ও পেমেন্ট', icon: CreditCard },
+    { id: 'reports', label: 'রিপোর্ট', icon: BarChart3 },
     { id: 'audit', label: 'অডিট লগ', icon: FileText },
     { id: 'settings', label: 'সেটিংস', icon: Settings },
   ];
@@ -193,349 +206,6 @@ export default function AdminDashboard({ admin, onLogout }) {
           <span className="text-gray-500 ml-2">vs last month</span>
         </div>
       )}
-    </div>
-  );
-
-  // Render RADIUS Server Status
-  const renderRadiusStatus = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {renderStatCard(
-          'Server Status',
-          radiusStatus?.status === 'online' ? '🟢 Online' : '🔴 Offline',
-          Server,
-          radiusStatus?.status === 'online' ? 'bg-green-500' : 'bg-red-500',
-          null,
-          radiusStatus?.server || 'FreeRADIUS'
-        )}
-        {renderStatCard(
-          'Uptime',
-          radiusStatus?.uptime || 'N/A',
-          Clock,
-          'bg-blue-500',
-          null,
-          'Server running time'
-        )}
-        {renderStatCard(
-          'Connections Today',
-          radiusStatus?.connections_today?.toLocaleString() || 0,
-          Activity,
-          'bg-purple-500',
-          '+12%',
-          'Total authentications'
-        )}
-        {renderStatCard(
-          'Requests/sec',
-          radiusStatus?.requests_per_second || 0,
-          Zap,
-          'bg-orange-500',
-          null,
-          'Average RPS'
-        )}
-      </div>
-
-      {/* RADIUS Server Details */}
-      <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <Server className="w-5 h-5 text-primary" />
-          RADIUS Server Details
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Database className="w-5 h-5 text-blue-500" />
-              <span className="font-medium text-gray-700 dark:text-gray-300">Database</span>
-            </div>
-            <p className="text-sm text-green-600 dark:text-green-400">Connected ✓</p>
-          </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Shield className="w-5 h-5 text-green-500" />
-              <span className="font-medium text-gray-700 dark:text-gray-300">Authentication</span>
-            </div>
-            <p className="text-sm text-green-600 dark:text-green-400">Port 1812 ✓</p>
-          </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <HardDrive className="w-5 h-5 text-purple-500" />
-              <span className="font-medium text-gray-700 dark:text-gray-300">Accounting</span>
-            </div>
-            <p className="text-sm text-green-600 dark:text-green-400">Port 1813 ✓</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render Active Sessions
-  const renderActiveSessions = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Active Sessions</h2>
-        <button 
-          onClick={fetchDashboardData}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
-      </div>
-
-      {coaResult && (
-        <div className={`p-4 rounded-lg ${coaResult.type === 'success' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'}`}>
-          {coaResult.message}
-        </div>
-      )}
-
-      {/* Sessions Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {renderStatCard(
-          'Active Sessions',
-          activeSessions.length,
-          Signal,
-          'bg-green-500',
-          '+5%',
-          'Currently online'
-        )}
-        {renderStatCard(
-          'Total Upload',
-          formatBytes(activeSessions.reduce((sum, s) => sum + (s.upload_bytes || 0), 0)),
-          Activity,
-          'bg-blue-500',
-          null,
-          'All sessions'
-        )}
-        {renderStatCard(
-          'Total Download',
-          formatBytes(activeSessions.reduce((sum, s) => sum + (s.download_bytes || 0), 0)),
-          Activity,
-          'bg-purple-500',
-          null,
-          'All sessions'
-        )}
-        {renderStatCard(
-          'Avg Session Time',
-          formatDuration(Math.round(activeSessions.reduce((sum, s) => sum + (s.session_time || 0), 0) / (activeSessions.length || 1))),
-          Clock,
-          'bg-orange-500',
-          null,
-          'Per user'
-        )}
-      </div>
-
-      {/* Sessions Table */}
-      <div className="bg-white dark:bg-boxdark rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">NAS IP</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Framed IP</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Time</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Upload</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Download</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {activeSessions.map((session) => (
-                <tr key={session.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {session.username}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {session.nas_ip}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {session.framed_ip}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(session.start_time).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {formatDuration(session.session_time)}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {formatBytes(session.upload_bytes)}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {formatBytes(session.download_bytes)}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <button
-                      onClick={() => handleDisconnectSession(session.id)}
-                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                      disabled={coaLoading}
-                    >
-                      Disconnect
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {activeSessions.length === 0 && (
-                <tr>
-                  <td colSpan="8" className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                    No active sessions
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render NAS Clients
-  const renderNasClients = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">NAS Clients Management</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {nasClients.map((nas) => (
-          <div key={nas.id} className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-lg ${
-                  nas.nas_type === 'mikrotik' ? 'bg-orange-100 dark:bg-orange-900/30' :
-                  nas.nas_type === 'ubiquiti' ? 'bg-blue-100 dark:bg-blue-900/30' :
-                  'bg-gray-100 dark:bg-gray-700'
-                }`}>
-                  <Globe className={`w-6 h-6 ${
-                    nas.nas_type === 'mikrotik' ? 'text-orange-500' :
-                    nas.nas_type === 'ubiquiti' ? 'text-blue-500' :
-                    'text-gray-500'
-                  }`} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">{nas.nas_name}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{nas.nas_type}</p>
-                </div>
-              </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                nas.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-800'
-              }`}>
-                {nas.status}
-              </span>
-            </div>
-            
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">IP Address:</span>
-                <span className="text-gray-900 dark:text-white font-mono">{nas.nas_ip}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">Last Heartbeat:</span>
-                <span className="text-gray-900 dark:text-white">{nas.last_heartbeat ? new Date(nas.last_heartbeat).toLocaleString() : 'N/A'}</span>
-              </div>
-            </div>
-            
-            <div className="mt-4 flex gap-2">
-              <button className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
-                Test Connection
-              </button>
-              <button className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600">
-                Reboot
-              </button>
-            </div>
-          </div>
-        ))}
-        
-        {nasClients.length === 0 && (
-          <div className="col-span-3 bg-white dark:bg-boxdark rounded-lg p-8 text-center">
-            <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">No NAS clients configured</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // Render COA Operations
-  const renderCoaOperations = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">COA Operations</h2>
-      
-      {coaResult && (
-        <div className={`p-4 rounded-lg ${coaResult.type === 'success' ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
-          {coaResult.message}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Change Speed */}
-        <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-yellow-500" />
-            Change Speed
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
-              <input type="text" id="coa-username" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" placeholder="Enter username" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Speed</label>
-              <select id="coa-speed" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white">
-                <option value="5M/5M">5 Mbps</option>
-                <option value="10M/10M">10 Mbps</option>
-                <option value="20M/20M">20 Mbps</option>
-                <option value="50M/50M">50 Mbps</option>
-                <option value="100M/100M">100 Mbps</option>
-              </select>
-            </div>
-            <button 
-              onClick={() => handleChangeSpeed(
-                document.getElementById('coa-username').value,
-                document.getElementById('coa-speed').value
-              )}
-              disabled={coaLoading}
-              className="w-full px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50"
-            >
-              {coaLoading ? 'Processing...' : 'Apply Speed Change'}
-            </button>
-          </div>
-        </div>
-
-        {/* Disconnect User */}
-        <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <LogOut className="w-5 h-5 text-red-500" />
-            Disconnect User
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
-              <input type="text" id="disconnect-username" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white" placeholder="Enter username to disconnect" />
-            </div>
-            <button 
-              onClick={() => handleDisconnectUser(document.getElementById('disconnect-username').value)}
-              disabled={coaLoading}
-              className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
-            >
-              {coaLoading ? 'Processing...' : 'Disconnect User'}
-            </button>
-          </div>
-        </div>
-
-        {/* FUP Operations */}
-        <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-purple-500" />
-            FUP Operations
-          </h3>
-          <div className="space-y-4">
-            <button className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">
-              Check All Users FUP
-            </button>
-            <button className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-              Reset Monthly Quota
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 
@@ -728,23 +398,36 @@ export default function AdminDashboard({ admin, onLogout }) {
     switch (activeTab) {
       case 'dashboard':
         return renderDashboard();
-      case 'radius':
-        return renderRadiusStatus();
-      case 'sessions':
-        return renderActiveSessions();
-      case 'nas':
-        return renderNasClients();
-      case 'coa':
-        return renderCoaOperations();
       case 'users':
+        return <UsersManagement />;
+      case 'packages':
+        return <PackageManagement />;
+      case 'radius':
+        return <RadiusClient />;
+      case 'devices':
+        return <DeviceManagement />;
+      case 'sessions':
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Users Management</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Session Management</h2>
             <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
-              <p className="text-gray-600 dark:text-gray-400">User management features coming soon...</p>
+              <p className="text-gray-600 dark:text-gray-400">Session management features coming soon...</p>
             </div>
           </div>
         );
+      case 'coa':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">COA Operations</h2>
+            <div className="bg-white dark:bg-boxdark rounded-lg p-6 shadow-sm">
+              <p className="text-gray-600 dark:text-gray-400">COA features coming soon...</p>
+            </div>
+          </div>
+        );
+      case 'recharge':
+        return <RechargePayment />;
+      case 'reports':
+        return <ReportsPage />;
       case 'audit':
         return (
           <div className="space-y-6">
