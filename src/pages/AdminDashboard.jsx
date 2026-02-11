@@ -4,7 +4,7 @@ import {
   Menu, X, ChevronDown, Wifi, Activity, 
   TrendingUp, AlertCircle, CheckCircle, Clock, ChevronLeft, ChevronRight,
   Server, Signal, HardDrive, RefreshCw, Zap, Globe, Shield, Database,
-  CreditCard, Package, Router, BarChart3, UserPlus, UserMinus, Eye, Search
+  CreditCard, Package, Router, BarChart3, UserPlus, UserMinus, Eye, Search, User
 } from 'lucide-react';
 import { dashboardAPI, radiusAPI, coaAPI, fupAPI, usersAPI, packagesAPI } from '../lib/api';
 
@@ -15,11 +15,13 @@ import ReportsPage from './ReportsPage';
 import RechargePayment from './RechargePayment';
 import RadiusClient from './RadiusClient';
 import DeviceManagement from './DeviceManagement';
+import AdminProfile from './AdminProfile';
 
 export default function AdminDashboard({ admin, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   
   // Dashboard Stats
   const [stats, setStats] = useState(null);
@@ -570,6 +572,16 @@ export default function AdminDashboard({ admin, onLogout }) {
             {userMenuOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-boxdark rounded-lg shadow-lg py-2 z-50">
                 <button
+                  onClick={() => {
+                    setShowProfileModal(true);
+                    setUserMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <User size={18} />
+                  Profile
+                </button>
+                <button
                   onClick={onLogout}
                   className="flex w-full items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
@@ -595,6 +607,11 @@ export default function AdminDashboard({ admin, onLogout }) {
           )}
         </main>
       </div>
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <AdminProfile admin={admin} onClose={() => setShowProfileModal(false)} />
+      )}
     </div>
   );
 }

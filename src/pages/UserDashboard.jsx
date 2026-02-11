@@ -5,11 +5,13 @@ import {
   Signal, Zap, Database, RefreshCw, Server, TrendingUp
 } from 'lucide-react';
 import { dashboardAPI, radiusAPI } from '../lib/api';
+import UserProfile from './UserProfile';
 
 export default function UserDashboard({ admin, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -814,6 +816,16 @@ export default function UserDashboard({ admin, onLogout }) {
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-boxdark rounded-lg shadow-lg py-2 z-50">
                 <button
+                  onClick={() => {
+                    setShowProfileModal(true);
+                    setDropdownOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <User size={18} />
+                  Profile
+                </button>
+                <button
                   onClick={onLogout}
                   className="flex w-full items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
@@ -844,6 +856,11 @@ export default function UserDashboard({ admin, onLogout }) {
           )}
         </main>
       </div>
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <UserProfile user={userData} onClose={() => setShowProfileModal(false)} />
+      )}
     </div>
   );
 }
